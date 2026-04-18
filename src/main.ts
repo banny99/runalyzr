@@ -182,7 +182,6 @@ async function main() {
   type CameraState = 'closed' | 'setup' | 'recording';
   let cameraState: CameraState = 'closed';
   let cameraRunning = false;            // separate flag so the rAF loop can exit cleanly
-  let cameraLandmarker: Awaited<ReturnType<typeof initLandmarker>> | null = null;
   let cameraRafId = 0;
   let setupConsecutiveFrames = 0;
   let lastLandmarkTime = 0;
@@ -224,7 +223,10 @@ async function main() {
     loop.stop();
 
     await startCamera(video);
+
+    // Sync canvas size now; re-sync when the stream delivers its first real dimensions
     overlay.syncSize();
+    video.addEventListener('resize', () => overlay.syncSize(), { once: true });
 
     recordBtn.style.display = 'flex';
     recordBtn.disabled = true;
@@ -237,36 +239,36 @@ async function main() {
     cameraFrames.length = 0;
     cameraRunning = true;
 
-    cameraLandmarker = await initLandmarker(undefined, 'LIVE_STREAM', (landmarks: LandmarkArray) => {
-      if (!cameraRunning) return;
-
-      lastLandmarkTime = performance.now();
-      const statuses = lastResults ? buildJointStatuses(lastResults) : {};
-      overlay.drawSkeleton(landmarks, statuses);
-
-      if (cameraState === 'setup') {
-        setupConsecutiveFrames++;
-        const checks = evaluateSetupChecks(landmarks, setupConsecutiveFrames);
-        refreshSetupUI(checks);
-        drawSetupGuide(canvas, checks.allPassed);
-        recordBtn.disabled = !checks.allPassed;
-        recordBtn.classList.toggle('ready', checks.allPassed);
-
-      } else if (cameraState === 'recording') {
-        cameraFrames.push({ landmarks, timestamp: performance.now() });
-        updateLiveMetrics(null, detectCameraView(landmarks), 30);
-      }
-    });
-
+    // Reuse the existing VIDEO-mode landmarker synchronously — no second model load.
     (function cameraLoop() {
       if (!cameraRunning) return;
-      // If detection is lost for > 500 ms, reset stability counter
-      if (cameraState === 'setup' && performance.now() - lastLandmarkTime > 500) {
-        setupConsecutiveFrames = 0;
-      }
+
       if (video.readyState >= 2) {
-        cameraLandmarker!.detectForVideo(video, performance.now());
+        const result = landmarker.detectForVideo(video, performance.now());
+        if (result.landmarks.length > 0) {
+          const lms = result.landmarks[0] as LandmarkArray;
+          lastLandmarkTime = performance.now();
+
+          const statuses = lastResults ? buildJointStatuses(lastResults) : {};
+          overlay.drawSkeleton(lms, statuses);
+
+          if (cameraState === 'setup') {
+            setupConsecutiveFrames++;
+            const checks = evaluateSetupChecks(lms, setupConsecutiveFrames);
+            refreshSetupUI(checks);
+            drawSetupGuide(canvas, checks.allPassed);
+            recordBtn.disabled = !checks.allPassed;
+            recordBtn.classList.toggle('ready', checks.allPassed);
+          } else if (cameraState === 'recording') {
+            cameraFrames.push({ landmarks: lms, timestamp: performance.now() });
+            updateLiveMetrics(null, detectCameraView(lms), 30);
+          }
+        } else if (cameraState === 'setup' && performance.now() - lastLandmarkTime > 500) {
+          // Person left frame — reset stability counter
+          setupConsecutiveFrames = 0;
+        }
       }
+
       cameraRafId = requestAnimationFrame(cameraLoop);
     })();
   }
@@ -278,8 +280,6 @@ async function main() {
     cancelAnimationFrame(cameraRafId);
     clearInterval(recTimerInterval);
     stopCamera(video);
-    cameraLandmarker?.close();
-    cameraLandmarker = null;
 
     cameraOpenBtn.textContent = 'Camera';
     recordBtn.style.display = 'none';
