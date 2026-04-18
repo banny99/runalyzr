@@ -22,6 +22,42 @@ export function initVideoPlayer(
   video.addEventListener('pause', callbacks.onPause);
   video.addEventListener('seeked', callbacks.onSeeked);
   video.addEventListener('loadedmetadata', callbacks.onLoadedMetadata);
+
+  // Show playback controls when video is loaded
+  video.addEventListener('loadedmetadata', () => {
+    const controls = document.getElementById('playback-controls');
+    if (controls) controls.style.display = 'flex';
+  });
+
+  const frameBackBtn = document.getElementById('frame-back') as HTMLButtonElement | null;
+  const frameForwardBtn = document.getElementById('frame-forward') as HTMLButtonElement | null;
+  const speedSelect = document.getElementById('speed-select') as HTMLSelectElement | null;
+
+  frameBackBtn?.addEventListener('click', () => {
+    video.pause();
+    video.currentTime = Math.max(0, video.currentTime - 1 / 30);
+  });
+
+  frameForwardBtn?.addEventListener('click', () => {
+    video.pause();
+    video.currentTime = Math.min(video.duration, video.currentTime + 1 / 30);
+  });
+
+  speedSelect?.addEventListener('change', () => {
+    video.playbackRate = parseFloat(speedSelect.value);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      video.pause();
+      video.currentTime = Math.max(0, video.currentTime - 1 / 30);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      video.pause();
+      video.currentTime = Math.min(video.duration, video.currentTime + 1 / 30);
+    }
+  });
 }
 
 export async function startCamera(video: HTMLVideoElement): Promise<void> {
