@@ -1,0 +1,127 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f0f0f;
+  color: #f0f0f0;
+  min-height: 100vh;
+}
+
+#app-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+
+#app-header h1 { font-size: 1.25rem; font-weight: 700; color: #22c55e; }
+
+#upload-controls { display: flex; gap: 0.5rem; align-items: center; margin-left: auto; }
+
+#upload-label, button {
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+#upload-label:hover, button:hover:not(:disabled) { background: #333; }
+button:disabled { opacity: 0.4; cursor: default; }
+#file-input { display: none; }
+
+#video-section {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+#video-container {
+  position: relative;
+  flex: 3;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#video { width: 100%; display: block; }
+
+#overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+#live-metrics {
+  flex: 1;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+#summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.metric-card {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 0.75rem;
+  border: 1px solid #333;
+}
+.metric-card .metric-name { font-size: 0.75rem; color: #aaa; margin-bottom: 0.25rem; }
+.metric-card .metric-value { font-size: 1.25rem; font-weight: 700; }
+.metric-card .metric-range { font-size: 0.7rem; color: #666; margin-top: 0.25rem; }
+.metric-card.green { border-color: #22c55e; }
+.metric-card.amber { border-color: #f59e0b; }
+.metric-card.red { border-color: #ef4444; }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.status-dot.green { background: #22c55e; }
+.status-dot.amber { background: #f59e0b; }
+.status-dot.red { background: #ef4444; }
+
+#findings { padding: 1rem; }
+#findings h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+.finding-item { background: #1a1a1a; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; font-size: 0.875rem; line-height: 1.5; }
+.finding-item.red { border-left: 3px solid #ef4444; }
+.finding-item.amber { border-left: 3px solid #f59e0b; }
+
+#export-section {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 600px;
+}
+#client-name, #physio-notes {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #f0f0f0;
+  padding: 0.5rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+#physio-notes { min-height: 80px; resize: vertical; }
+#export-pdf { align-self: flex-start; background: #22c55e; color: #000; border-color: #22c55e; font-weight: 600; }
+#export-pdf:hover:not(:disabled) { background: #16a34a; }
+
+#loading-msg {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  font-size: 1rem;
+  z-index: 100;
+}
