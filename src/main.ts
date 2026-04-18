@@ -108,7 +108,7 @@ async function main() {
   const exportPdfBtn     = document.getElementById('export-pdf')     as HTMLButtonElement;
   const cameraOpenBtn    = document.getElementById('camera-open-btn')  as HTMLButtonElement;
   const recordBtn        = document.getElementById('record-btn')       as HTMLButtonElement;
-  const flipCameraBtn    = document.getElementById('flip-camera-btn')  as HTMLButtonElement;
+  const viewModeBtn      = document.getElementById('view-mode-btn')    as HTMLButtonElement;
   const recIndicator     = document.getElementById('rec-indicator')    as HTMLElement;
   const recTimerEl       = document.getElementById('rec-timer')        as HTMLElement;
   const liveMetricsEl    = document.getElementById('live-metrics')     as HTMLElement;
@@ -138,11 +138,11 @@ async function main() {
   }
 
   // Shared analysis runner (video file and camera)
-  function runAnalysis(frames: FrameData[]): void {
+  function runAnalysis(frames: FrameData[], viewOverride: 'sagittal' | 'frontal' | null = null): void {
     if (frames.length < 30) return;
     const durationSec = (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000;
     const fps  = frames.length / durationSec;
-    const view = detectCameraView(frames[frames.length - 1].landmarks);
+    const view: CameraView = viewOverride ?? detectCameraView(frames[frames.length - 1].landmarks);
     const gaitEvents = detectGaitEvents(frames, fps);
     const gaitCycles = segmentGaitCycles(gaitEvents);
     const results    = calculateAllMetrics(frames, gaitEvents, gaitCycles, fps, view);
@@ -182,7 +182,7 @@ async function main() {
 
   type CameraState = 'closed' | 'setup' | 'recording';
   let cameraState: CameraState = 'closed';
-  let cameraFacing: 'environment' | 'user' = 'environment';
+  let selectedView: 'sagittal' | 'frontal' | null = null; // null = auto-detect
   let cameraRunning = false;            // separate flag so the rAF loop can exit cleanly
   let cameraRafId = 0;
   let setupConsecutiveFrames = 0;
@@ -212,11 +212,31 @@ async function main() {
     applyCheck('check-body',     checks.bodyInFrame,  'Full body in frame',   'Full body not visible');
     applyCheck('check-distance', checks.goodDistance, 'Good distance',        'Adjust distance');
     applyCheck('check-lighting', checks.goodLighting, 'Adequate lighting',    'Improve lighting');
-    const viewLabel = checks.view === 'sagittal' ? 'Side view (sagittal)'
-                    : checks.view === 'frontal'  ? 'Front view (frontal)'
-                    : 'Detecting view…';
-    document.getElementById('check-view')!.textContent = `View: ${viewLabel}`;
-    document.getElementById('setup-hint')!.textContent = checks.hint;
+
+    const viewEl = document.getElementById('check-view')!;
+    if (selectedView !== null) {
+      const label    = selectedView === 'sagittal' ? 'Side view' : 'Front view';
+      const autoOk   = checks.view === selectedView;
+      const suffix   = autoOk ? ' ✓' : ` — auto-detected ${checks.view === 'sagittal' ? 'side' : checks.view === 'frontal' ? 'front' : 'unknown'}`;
+      viewEl.textContent = `${label} (manual)${suffix}`;
+    } else {
+      const autoLabel = checks.view === 'sagittal' ? 'Side view'
+                      : checks.view === 'frontal'  ? 'Front view'
+                      : 'Detecting…';
+      viewEl.textContent = `View: ${autoLabel} (auto)`;
+    }
+
+    // Angle-specific positioning hint (overrides check hint if checks pass)
+    let hint = checks.hint;
+    if (checks.allPassed && selectedView === 'sagittal')
+      hint = 'Good! Stand perpendicular to the camera, hip-height lens, 3–5 m away.';
+    else if (checks.allPassed && selectedView === 'frontal')
+      hint = 'Good! Face the camera directly, chest-height lens, 3–5 m away.';
+    else if (!checks.hint && selectedView === 'sagittal')
+      hint = 'Side view: stand sideways so the camera sees your full profile.';
+    else if (!checks.hint && selectedView === 'frontal')
+      hint = 'Front view: face the camera directly, arms relaxed.';
+    document.getElementById('setup-hint')!.textContent = hint;
   }
 
   async function openCamera(): Promise<void> {
@@ -224,7 +244,7 @@ async function main() {
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
 
-    await startCamera(video, cameraFacing);
+    await startCamera(video);
 
     // Sync canvas size now; re-sync when the stream delivers its first real dimensions
     overlay.syncSize();
@@ -234,7 +254,8 @@ async function main() {
     recordBtn.disabled = true;
     recordBtn.classList.remove('ready', 'recording');
     recordBtn.setAttribute('aria-label', 'Start recording');
-    flipCameraBtn.style.display = 'flex';
+    viewModeBtn.style.display = 'flex';
+    updateViewModeBtn();
     showSetupPanel();
 
     setupConsecutiveFrames = 0;
@@ -287,11 +308,11 @@ async function main() {
     cameraOpenBtn.textContent = 'Camera';
     recordBtn.style.display = 'none';
     recordBtn.classList.remove('ready', 'recording');
-    flipCameraBtn.style.display = 'none';
+    viewModeBtn.style.display = 'none';
     recIndicator.style.display = 'none';
     showLivePanel();
 
-    if (wasRecording) runAnalysis([...cameraFrames]);
+    if (wasRecording) runAnalysis([...cameraFrames], selectedView);
   }
 
   function startRecording(): void {
@@ -301,7 +322,7 @@ async function main() {
     recordBtn.classList.add('recording');
     recordBtn.disabled = false;
     recordBtn.setAttribute('aria-label', 'Stop recording');
-    flipCameraBtn.style.display = 'none';
+    viewModeBtn.style.display = 'none';
     recIndicator.style.display = 'flex';
     showLivePanel();
 
@@ -320,12 +341,12 @@ async function main() {
     recordBtn.classList.remove('recording', 'ready');
     recordBtn.disabled = true;
     recordBtn.setAttribute('aria-label', 'Start recording');
-    flipCameraBtn.style.display = 'flex';
+    viewModeBtn.style.display = 'flex';
     setupConsecutiveFrames = 0;
     lastLandmarkTime = performance.now();
     showSetupPanel();
 
-    runAnalysis([...cameraFrames]);
+    runAnalysis([...cameraFrames], selectedView);
   }
 
   cameraOpenBtn.addEventListener('click', () => {
@@ -333,15 +354,28 @@ async function main() {
     else closeCamera();
   });
 
-  flipCameraBtn.addEventListener('click', () => {
+  function updateViewModeBtn(): void {
+    if (selectedView === 'sagittal') {
+      viewModeBtn.textContent = 'Side view';
+      viewModeBtn.classList.remove('view-front');
+      viewModeBtn.classList.add('view-side');
+    } else if (selectedView === 'frontal') {
+      viewModeBtn.textContent = 'Front view';
+      viewModeBtn.classList.remove('view-side');
+      viewModeBtn.classList.add('view-front');
+    } else {
+      viewModeBtn.textContent = 'Auto view';
+      viewModeBtn.classList.remove('view-side', 'view-front');
+    }
+  }
+
+  viewModeBtn.addEventListener('click', () => {
     if (cameraState !== 'setup') return;
-    cameraFacing = cameraFacing === 'environment' ? 'user' : 'environment';
-    // Restart camera stream with the new facing mode
-    cameraRunning = false;
-    cancelAnimationFrame(cameraRafId);
-    stopCamera(video);
-    setupConsecutiveFrames = 0;
-    openCamera().catch(console.error);
+    // Cycle: null → sagittal → frontal → null
+    selectedView = selectedView === null ? 'sagittal'
+                 : selectedView === 'sagittal' ? 'frontal'
+                 : null;
+    updateViewModeBtn();
   });
 
   recordBtn.addEventListener('click', () => {

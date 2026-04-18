@@ -33,17 +33,20 @@
 
   <main>
     <section id="video-section">
-      <div id="video-container">
-        <video id="video" playsinline></video>
-        <canvas id="overlay"></canvas>
-        <!-- Flip camera button — shown only during camera setup -->
-        <button id="flip-camera-btn" aria-label="Flip camera" title="Switch front/back camera">⟳</button>
-        <!-- REC indicator — shown only while recording -->
-        <div id="rec-indicator">
-          <span class="rec-dot"></span>
-          REC <span id="rec-timer">0:00</span>
+      <!-- camera-column keeps video and record button in the same flex column -->
+      <div id="camera-column">
+        <div id="video-container">
+          <video id="video" playsinline></video>
+          <canvas id="overlay"></canvas>
+          <!-- View mode selector — shown only during camera setup -->
+          <button id="view-mode-btn" aria-label="Select camera angle" title="Select camera angle">Side</button>
+          <!-- REC indicator — shown only while recording -->
+          <div id="rec-indicator">
+            <span class="rec-dot"></span>
+            REC <span id="rec-timer">0:00</span>
+          </div>
         </div>
-        <!-- Round record/stop button — shown only in camera mode -->
+        <!-- Round record/stop button sits BELOW the video so it cannot affect canvas sizing -->
         <button id="record-btn" aria-label="Start recording" disabled></button>
       </div>
 
