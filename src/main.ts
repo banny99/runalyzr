@@ -243,6 +243,7 @@ async function main() {
     cameraState = 'setup';
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
+    (document.getElementById('playback-controls') as HTMLElement).style.display = 'none';
 
     await startCamera(video);
 
@@ -306,6 +307,8 @@ async function main() {
     stopCamera(video);
 
     cameraOpenBtn.textContent = 'Camera';
+    // Restore playback controls if a video file is loaded
+    if (video.src) (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
     recordBtn.style.display = 'none';
     recordBtn.classList.remove('ready', 'recording');
     viewModeBtn.style.display = 'none';
