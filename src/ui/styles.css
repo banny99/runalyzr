@@ -30,7 +30,7 @@ body {
   font-size: 0.875rem;
 }
 #upload-label:hover, button:hover:not(:disabled) { background: #333; }
-button:disabled { opacity: 0.4; cursor: default; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
 #file-input { display: none; }
 
 #video-section {
@@ -56,13 +56,161 @@ button:disabled { opacity: 0.4; cursor: default; }
   pointer-events: none;
 }
 
-#live-metrics {
+/* ── REC indicator ─────────────────────────────────────────────────────── */
+
+#rec-indicator {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: none;            /* shown via JS */
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 0.25rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+/* ── Round record / stop button ────────────────────────────────────────── */
+
+#record-btn {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.85) !important;
+  background: transparent !important;
+  padding: 0 !important;
+  display: none;            /* shown via JS as flex */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: border-color 0.2s;
+}
+
+/* Inner shape — circle by default, becomes a square when recording */
+#record-btn::before {
+  content: '';
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ef4444;
+  transition: border-radius 0.2s, width 0.2s, height 0.2s, background 0.2s;
+}
+
+#record-btn.recording::before {
+  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  background: #fff;
+}
+
+#record-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+#record-btn:hover:not(:disabled) { background: transparent !important; }
+
+/* ── Sidebar panels ────────────────────────────────────────────────────── */
+
+#live-metrics,
+#setup-guidance {
   flex: 1;
   background: #1a1a1a;
   border-radius: 8px;
   padding: 1rem;
   font-size: 0.875rem;
 }
+
+#setup-guidance { display: none; }   /* hidden until camera setup mode */
+
+#setup-guidance h3 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #888;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Setup checklist ───────────────────────────────────────────────────── */
+
+#setup-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+
+#setup-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+#setup-checklist li::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #444;
+  transition: background 0.2s;
+}
+
+#setup-checklist li.check-pass::before    { background: #22c55e; }
+#setup-checklist li.check-fail::before    { background: #ef4444; }
+#setup-checklist li.check-pending::before {
+  background: #555;
+  animation: rec-pulse 1.5s ease-in-out infinite;
+}
+
+.check-view {
+  font-size: 0.75rem;
+  color: #777;
+  margin-bottom: 0.5rem;
+}
+
+#setup-hint {
+  font-size: 0.78rem;
+  color: #f59e0b;
+  min-height: 2.4rem;
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+
+.setup-tip {
+  font-size: 0.72rem;
+  color: #555;
+  line-height: 1.45;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 0.6rem;
+}
+
+/* ── Summary cards ─────────────────────────────────────────────────────── */
 
 #summary-cards {
   display: grid;
@@ -77,22 +225,26 @@ button:disabled { opacity: 0.4; cursor: default; }
   padding: 0.75rem;
   border: 1px solid #333;
 }
-.metric-card .metric-name { font-size: 0.75rem; color: #aaa; margin-bottom: 0.25rem; }
+.metric-card .metric-name  { font-size: 0.75rem; color: #aaa; margin-bottom: 0.25rem; }
 .metric-card .metric-value { font-size: 1.25rem; font-weight: 700; }
 .metric-card .metric-range { font-size: 0.7rem; color: #666; margin-top: 0.25rem; }
 .metric-card.green { border-color: #22c55e; }
 .metric-card.amber { border-color: #f59e0b; }
-.metric-card.red { border-color: #ef4444; }
+.metric-card.red   { border-color: #ef4444; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
 .status-dot.green { background: #22c55e; }
 .status-dot.amber { background: #f59e0b; }
-.status-dot.red { background: #ef4444; }
+.status-dot.red   { background: #ef4444; }
+
+/* ── Findings ──────────────────────────────────────────────────────────── */
 
 #findings { padding: 1rem; }
 #findings h2 { font-size: 1rem; margin-bottom: 0.75rem; }
 .finding-item { background: #1a1a1a; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; font-size: 0.875rem; line-height: 1.5; }
-.finding-item.red { border-left: 3px solid #ef4444; }
+.finding-item.red   { border-left: 3px solid #ef4444; }
 .finding-item.amber { border-left: 3px solid #f59e0b; }
+
+/* ── Export ────────────────────────────────────────────────────────────── */
 
 #export-section {
   padding: 1rem;
@@ -113,6 +265,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 #physio-notes { min-height: 80px; resize: vertical; }
 #export-pdf { align-self: flex-start; background: #22c55e; color: #000; border-color: #22c55e; font-weight: 600; }
 #export-pdf:hover:not(:disabled) { background: #16a34a; }
+
+/* ── Loading overlay ───────────────────────────────────────────────────── */
 
 #loading-msg {
   position: fixed;

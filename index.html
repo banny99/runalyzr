@@ -16,7 +16,7 @@
     <div id="upload-controls">
       <label id="upload-label" for="file-input">Upload Video</label>
       <input type="file" id="file-input" accept="video/mp4,video/quicktime" />
-      <button id="camera-btn">Use Camera</button>
+      <button id="camera-open-btn">Camera</button>
       <button id="toggle-overlay">Toggle Overlay</button>
     </div>
   </header>
@@ -32,28 +32,50 @@
   </div>
 
   <main>
-    <!-- Section 1: Video + live metrics -->
     <section id="video-section">
       <div id="video-container">
         <video id="video" playsinline></video>
         <canvas id="overlay"></canvas>
+        <!-- REC indicator — shown only while recording -->
+        <div id="rec-indicator">
+          <span class="rec-dot"></span>
+          REC <span id="rec-timer">0:00</span>
+        </div>
+        <!-- Round record/stop button — shown only in camera mode -->
+        <button id="record-btn" aria-label="Start recording" disabled></button>
       </div>
+
+      <!-- Shown during video playback / camera recording -->
       <div id="live-metrics">
         <p id="cadence-display">Cadence: —</p>
         <p id="view-display">View: —</p>
       </div>
+
+      <!-- Shown during camera setup phase (replaces live-metrics in that slot) -->
+      <div id="setup-guidance">
+        <h3>Positioning checklist</h3>
+        <ul id="setup-checklist">
+          <li id="check-stable"   class="check-pending">Detecting pose…</li>
+          <li id="check-body"     class="check-pending">Full body in frame</li>
+          <li id="check-distance" class="check-pending">Good distance</li>
+          <li id="check-lighting" class="check-pending">Adequate lighting</li>
+        </ul>
+        <p id="check-view" class="check-view">View: detecting…</p>
+        <p id="setup-hint"></p>
+        <p class="setup-tip">
+          Stand side-on (sagittal) for knee/hip metrics, or face-on (frontal) for pelvic/trunk metrics.
+          Record at least 10 seconds of running.
+        </p>
+      </div>
     </section>
 
-    <!-- Section 2: Summary cards -->
     <section id="summary-cards"></section>
 
-    <!-- Section 3: Findings -->
     <section id="findings">
       <h2>Findings</h2>
       <div id="findings-list"></div>
     </section>
 
-    <!-- Section 4: Export -->
     <section id="export-section">
       <input type="text" id="client-name" placeholder="Client name (not stored)" />
       <textarea id="physio-notes" placeholder="Session notes..."></textarea>
