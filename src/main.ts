@@ -3,6 +3,8 @@ import { initLandmarker } from './pose/landmarker';
 import { createProcessingLoop, detectCameraView } from './pose/processing';
 import { initOverlay } from './ui/overlay';
 import type { LandmarkArray } from './analysis/types';
+import { angleBetweenThreePoints } from './analysis/angles';
+import { LANDMARKS } from './config/defaults';
 
 async function main() {
   // Show loading indicator while MediaPipe initialises
@@ -24,6 +26,23 @@ async function main() {
 
   const loop = createProcessingLoop(landmarker, video, (landmarks: LandmarkArray) => {
     overlay.drawSkeleton(landmarks);
+
+    // Left knee angle
+    const leftKneeAngle = angleBetweenThreePoints(
+      landmarks[LANDMARKS.LEFT_HIP],
+      landmarks[LANDMARKS.LEFT_KNEE],
+      landmarks[LANDMARKS.LEFT_ANKLE],
+    );
+    overlay.drawAngleLabel(landmarks, LANDMARKS.LEFT_KNEE, `${leftKneeAngle.toFixed(0)}°`);
+
+    // Right knee angle
+    const rightKneeAngle = angleBetweenThreePoints(
+      landmarks[LANDMARKS.RIGHT_HIP],
+      landmarks[LANDMARKS.RIGHT_KNEE],
+      landmarks[LANDMARKS.RIGHT_ANKLE],
+    );
+    overlay.drawAngleLabel(landmarks, LANDMARKS.RIGHT_KNEE, `${rightKneeAngle.toFixed(0)}°`);
+
     const view = detectCameraView(landmarks);
     viewDisplay.textContent = `View: ${view}`;
   });
