@@ -1,5 +1,5 @@
 import { METRIC_LABELS } from '../config/defaults';
-import type { AnalysisResults, FindingItem, MetricStatus } from '../analysis/types';
+import type { AnalysisResults, FindingItem } from '../analysis/types';
 import { THRESHOLDS } from '../analysis/thresholds';
 
 export function renderDashboard(results: AnalysisResults, findings: FindingItem[]): void {

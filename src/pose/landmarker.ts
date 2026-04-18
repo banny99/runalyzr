@@ -14,7 +14,8 @@ export async function initLandmarker(
       modelAssetPath: modelUrl,
       delegate: 'GPU',
     },
-    runningMode: mode,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    runningMode: mode as any,
     numPoses: 1,
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,

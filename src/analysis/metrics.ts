@@ -3,7 +3,7 @@ import type {
   MetricResult, CameraView, Foot,
 } from './types';
 import { LANDMARKS } from '../config/defaults';
-import { angleBetweenThreePoints, lateralAngle, midpoint, verticalDisplacement } from './angles';
+import { angleBetweenThreePoints, lateralAngle, midpoint } from './angles';
 import { makeMetricResult } from './thresholds';
 
 export function calculateKneeFlexionAtContact(
