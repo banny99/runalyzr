@@ -1,4 +1,4 @@
-import { initVideoPlayer } from './ui/videoPlayer';
+import { initVideoPlayer, startCamera, stopCamera } from './ui/videoPlayer';
 import { initLandmarker } from './pose/landmarker';
 import { createProcessingLoop, detectCameraView } from './pose/processing';
 import { initOverlay } from './ui/overlay';
@@ -104,6 +104,59 @@ async function main() {
   });
 
   video.addEventListener('ended', () => { loop.stop(); runAnalysis(); });
+
+  // Live camera mode
+  const cameraBtn = document.getElementById('camera-btn') as HTMLButtonElement;
+  let cameraActive = false;
+
+  cameraBtn.addEventListener('click', async () => {
+    if (!cameraActive) {
+      cameraActive = true;
+      cameraBtn.textContent = 'Stop Camera';
+      loop.stop();
+      await startCamera(video);
+      overlay.syncSize();
+
+      // Use LIVE_STREAM landmarker for camera
+      const cameraLandmarker = await initLandmarker(
+        undefined,
+        'LIVE_STREAM',
+        (landmarks: LandmarkArray) => {
+          const statuses = lastResults ? buildJointStatuses(lastResults) : {};
+          overlay.drawSkeleton(landmarks, statuses);
+          overlay.drawAngleLabel(
+            landmarks,
+            LANDMARKS.LEFT_KNEE,
+            `${angleBetweenThreePoints(landmarks[LANDMARKS.LEFT_HIP], landmarks[LANDMARKS.LEFT_KNEE], landmarks[LANDMARKS.LEFT_ANKLE]).toFixed(0)}°`,
+          );
+          updateLiveMetrics(null, detectCameraView(landmarks), 30);
+        },
+      );
+
+      // Continuously feed frames to LIVE_STREAM landmarker
+      let rafId = 0;
+      function cameraLoop() {
+        if (!cameraActive) return;
+        if (video.readyState >= 2) {
+          cameraLandmarker.detectForVideo(video, performance.now());
+        }
+        rafId = requestAnimationFrame(cameraLoop);
+      }
+      cameraLoop();
+
+      // Store cleanup fn on button for stop handler
+      (cameraBtn as HTMLButtonElement & { _cleanup?: () => void })._cleanup = () => {
+        cameraActive = false;
+        cancelAnimationFrame(rafId);
+        stopCamera(video);
+        cameraLandmarker.close();
+      };
+    } else {
+      const cleanup = (cameraBtn as HTMLButtonElement & { _cleanup?: () => void })._cleanup;
+      cleanup?.();
+      cameraBtn.textContent = 'Use Camera';
+    }
+  });
 
   toggleOverlayBtn.addEventListener('click', () => {
     const isVisible = canvas.style.display !== 'none';
