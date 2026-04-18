@@ -42,7 +42,7 @@ export const METRIC_LABELS: Record<string, string> = {
   groundContactTime: 'Ground Contact Time',
 };
 
-export const APP_NAME = 'Runalyze';
+export const APP_NAME = 'Runalyzr';
 
 export const MEDIAPIPE_CDN = '/wasm';
 

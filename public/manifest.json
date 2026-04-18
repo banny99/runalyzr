@@ -1,12 +1,12 @@
 {
-  "name": "Runalyze",
-  "short_name": "Runalyze",
+  "name": "Runalyzr",
+  "short_name": "Runalyzr",
   "description": "Running gait analysis — on-device, no data transmitted",
-  "start_url": "/",
+  "start_url": "/runalyzr/",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#22c55e",
   "icons": [
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/runalyzr/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }
