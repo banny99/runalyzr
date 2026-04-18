@@ -5,6 +5,7 @@ import { initOverlay } from './ui/overlay';
 import type { LandmarkArray } from './analysis/types';
 import { angleBetweenThreePoints } from './analysis/angles';
 import { LANDMARKS } from './config/defaults';
+import { detectGaitEvents, calculateCadence } from './analysis/gaitDetection';
 
 async function main() {
   // Show loading indicator while MediaPipe initialises
@@ -18,6 +19,7 @@ async function main() {
   const fileInput = document.getElementById('file-input') as HTMLInputElement;
   const toggleOverlayBtn = document.getElementById('toggle-overlay') as HTMLButtonElement;
   const viewDisplay = document.getElementById('view-display') as HTMLParagraphElement;
+  const cadenceDisplay = document.getElementById('cadence-display') as HTMLParagraphElement;
 
   const landmarker = await initLandmarker();
   loadingEl.remove();
@@ -55,6 +57,18 @@ async function main() {
       const lm = loop.getCurrentLandmarks();
       if (lm) overlay.drawSkeleton(lm);
     },
+  });
+
+  video.addEventListener('ended', () => {
+    const frames = loop.getFrames();
+    if (frames.length < 10) return;
+
+    const durationSeconds = (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000;
+    const fps = frames.length / durationSeconds;
+
+    const gaitEvents = detectGaitEvents(frames, fps);
+    const cadence = calculateCadence(gaitEvents, durationSeconds);
+    cadenceDisplay.textContent = `Cadence: ${cadence} spm`;
   });
 
   toggleOverlayBtn.addEventListener('click', () => {
