@@ -1,9 +1,9 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-import { MEDIAPIPE_CDN, LITE_MODEL_URL } from '../config/defaults';
+import { MEDIAPIPE_CDN, HEAVY_MODEL_URL } from '../config/defaults';
 import type { LandmarkArray } from '../analysis/types';
 
 export async function initLandmarker(
-  modelUrl: string = LITE_MODEL_URL,
+  modelUrl: string = HEAVY_MODEL_URL,
   mode: 'VIDEO' | 'LIVE_STREAM' = 'VIDEO',
   onResult?: (landmarks: LandmarkArray, timestamp: number) => void,
 ): Promise<PoseLandmarker> {

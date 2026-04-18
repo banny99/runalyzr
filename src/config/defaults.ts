@@ -44,14 +44,12 @@ export const METRIC_LABELS: Record<string, string> = {
 
 export const APP_NAME = 'Runalyze';
 
-export const MEDIAPIPE_CDN =
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+export const MEDIAPIPE_CDN = '/wasm';
 
 export const LITE_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
-export const HEAVY_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task';
+export const HEAVY_MODEL_URL = '/models/pose_landmarker_heavy.task';
 
 export const FPS_TARGET = 30;
 export const FPS_SKIP_THRESHOLD = 20;
