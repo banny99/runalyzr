@@ -106,12 +106,13 @@ async function main() {
   const fileInput        = document.getElementById('file-input')     as HTMLInputElement;
   const toggleOverlayBtn = document.getElementById('toggle-overlay') as HTMLButtonElement;
   const exportPdfBtn     = document.getElementById('export-pdf')     as HTMLButtonElement;
-  const cameraOpenBtn    = document.getElementById('camera-open-btn') as HTMLButtonElement;
-  const recordBtn        = document.getElementById('record-btn')     as HTMLButtonElement;
-  const recIndicator     = document.getElementById('rec-indicator')  as HTMLElement;
-  const recTimerEl       = document.getElementById('rec-timer')      as HTMLElement;
-  const liveMetricsEl    = document.getElementById('live-metrics')   as HTMLElement;
-  const setupGuidanceEl  = document.getElementById('setup-guidance') as HTMLElement;
+  const cameraOpenBtn    = document.getElementById('camera-open-btn')  as HTMLButtonElement;
+  const recordBtn        = document.getElementById('record-btn')       as HTMLButtonElement;
+  const flipCameraBtn    = document.getElementById('flip-camera-btn')  as HTMLButtonElement;
+  const recIndicator     = document.getElementById('rec-indicator')    as HTMLElement;
+  const recTimerEl       = document.getElementById('rec-timer')        as HTMLElement;
+  const liveMetricsEl    = document.getElementById('live-metrics')     as HTMLElement;
+  const setupGuidanceEl  = document.getElementById('setup-guidance')   as HTMLElement;
 
   const landmarker = await initLandmarker();
   loadingEl.remove();
@@ -181,6 +182,7 @@ async function main() {
 
   type CameraState = 'closed' | 'setup' | 'recording';
   let cameraState: CameraState = 'closed';
+  let cameraFacing: 'environment' | 'user' = 'environment';
   let cameraRunning = false;            // separate flag so the rAF loop can exit cleanly
   let cameraRafId = 0;
   let setupConsecutiveFrames = 0;
@@ -222,7 +224,7 @@ async function main() {
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
 
-    await startCamera(video);
+    await startCamera(video, cameraFacing);
 
     // Sync canvas size now; re-sync when the stream delivers its first real dimensions
     overlay.syncSize();
@@ -232,6 +234,7 @@ async function main() {
     recordBtn.disabled = true;
     recordBtn.classList.remove('ready', 'recording');
     recordBtn.setAttribute('aria-label', 'Start recording');
+    flipCameraBtn.style.display = 'flex';
     showSetupPanel();
 
     setupConsecutiveFrames = 0;
@@ -284,6 +287,7 @@ async function main() {
     cameraOpenBtn.textContent = 'Camera';
     recordBtn.style.display = 'none';
     recordBtn.classList.remove('ready', 'recording');
+    flipCameraBtn.style.display = 'none';
     recIndicator.style.display = 'none';
     showLivePanel();
 
@@ -297,6 +301,7 @@ async function main() {
     recordBtn.classList.add('recording');
     recordBtn.disabled = false;
     recordBtn.setAttribute('aria-label', 'Stop recording');
+    flipCameraBtn.style.display = 'none';
     recIndicator.style.display = 'flex';
     showLivePanel();
 
@@ -315,6 +320,7 @@ async function main() {
     recordBtn.classList.remove('recording', 'ready');
     recordBtn.disabled = true;
     recordBtn.setAttribute('aria-label', 'Start recording');
+    flipCameraBtn.style.display = 'flex';
     setupConsecutiveFrames = 0;
     lastLandmarkTime = performance.now();
     showSetupPanel();
@@ -325,6 +331,17 @@ async function main() {
   cameraOpenBtn.addEventListener('click', () => {
     if (cameraState === 'closed') openCamera().catch(console.error);
     else closeCamera();
+  });
+
+  flipCameraBtn.addEventListener('click', () => {
+    if (cameraState !== 'setup') return;
+    cameraFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    // Restart camera stream with the new facing mode
+    cameraRunning = false;
+    cancelAnimationFrame(cameraRafId);
+    stopCamera(video);
+    setupConsecutiveFrames = 0;
+    openCamera().catch(console.error);
   });
 
   recordBtn.addEventListener('click', () => {
