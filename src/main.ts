@@ -13,16 +13,21 @@ import type { LandmarkArray, AnalysisResults, MetricStatus, FrameData, CameraVie
 // ── Setup-check helpers (pure, module-level) ────────────────────────────────
 
 interface SetupChecks {
+  viewSelected: boolean;
   bodyInFrame: boolean;
   goodDistance: boolean;
   goodLighting: boolean;
   stable: boolean;
-  view: CameraView;
+  detectedView: CameraView;
   allPassed: boolean;
   hint: string;
 }
 
-function evaluateSetupChecks(landmarks: LandmarkArray, consecutiveFrames: number): SetupChecks {
+function evaluateSetupChecks(
+  landmarks: LandmarkArray,
+  consecutiveFrames: number,
+  selectedView: 'sagittal' | 'frontal' | null,
+): SetupChecks {
   const L = LANDMARKS;
   const key = [
     L.LEFT_SHOULDER, L.RIGHT_SHOULDER,
@@ -50,22 +55,29 @@ function evaluateSetupChecks(landmarks: LandmarkArray, consecutiveFrames: number
   // Stable: landmark detected in ≥ 15 consecutive frames (~0.5 s at 30 fps)
   const stable = consecutiveFrames >= 15;
 
-  const view = detectCameraView(landmarks);
+  const detectedView = detectCameraView(landmarks);
+  const viewSelected = selectedView !== null;
 
   let hint = '';
-  if (!stable)             hint = 'Hold still — detecting your pose…';
+  if (!viewSelected)       hint = 'Tap the view button above to choose Side or Front view.';
+  else if (!stable)        hint = 'Hold still — detecting your pose…';
   else if (!bodyInFrame)   hint = 'Step back until your head and feet are fully visible.';
   else if (span < 0.40)    hint = 'Move closer to the camera.';
   else if (span > 0.90)    hint = 'Step further back — you are too close.';
   else if (!goodLighting)  hint = 'Improve lighting: face a window or bright light source.';
+  else if (selectedView === 'sagittal')
+    hint = 'Good! Stand sideways — camera at hip height, 3–5 m away.';
+  else if (selectedView === 'frontal')
+    hint = 'Good! Face the camera directly — chest height, 3–5 m away.';
 
   return {
+    viewSelected,
     bodyInFrame,
     goodDistance,
     goodLighting,
     stable,
-    view,
-    allPassed: bodyInFrame && goodDistance && goodLighting && stable,
+    detectedView,
+    allPassed: viewSelected && bodyInFrame && goodDistance && goodLighting && stable,
     hint,
   };
 }
@@ -167,7 +179,7 @@ async function main() {
   });
 
   initVideoPlayer(video, fileInput, {
-    onLoadedMetadata: () => overlay.syncSize(),
+    onLoadedMetadata: () => { overlay.syncSize(); cameraColumnEl.style.display = 'flex'; },
     onPlay:           () => loop.start(),
     onPause:          () => { loop.stop(); runAnalysis(loop.getFrames()); },
     onSeeked:         () => {
@@ -180,6 +192,8 @@ async function main() {
 
   // ── Camera mode state machine ───────────────────────────────────────────
 
+  const cameraColumnEl = document.getElementById('camera-column') as HTMLElement;
+
   type CameraState = 'closed' | 'setup' | 'recording';
   let cameraState: CameraState = 'closed';
   let selectedView: 'sagittal' | 'frontal' | null = null; // null = auto-detect
@@ -190,6 +204,9 @@ async function main() {
   let recTimerInterval = 0;
   let recStartTime = 0;
   const cameraFrames: FrameData[] = [];
+  let mediaRecorder: MediaRecorder | null = null;
+  const recordedChunks: Blob[] = [];
+  let recordedBlobUrl: string | null = null;
 
   function showSetupPanel(): void {
     liveMetricsEl.style.display   = 'none';
@@ -208,35 +225,22 @@ async function main() {
   }
 
   function refreshSetupUI(checks: SetupChecks): void {
-    applyCheck('check-stable',   checks.stable,       'Pose detected',        'Detecting pose…',    !checks.stable);
+    // View check: pass once selected, with detected-view context
+    if (checks.viewSelected) {
+      const label = selectedView === 'sagittal' ? 'Side view' : 'Front view';
+      const detected = checks.detectedView === selectedView ? '' :
+        ` — camera sees ${checks.detectedView === 'sagittal' ? 'side' : checks.detectedView === 'frontal' ? 'front' : 'unknown'}`;
+      applyCheck('check-view', true, `${label} selected${detected}`, '');
+    } else {
+      applyCheck('check-view', false, '', 'Choose view (tap button above)');
+    }
+
+    applyCheck('check-stable',   checks.stable,       'Pose detected',        'Detecting pose…', !checks.stable);
     applyCheck('check-body',     checks.bodyInFrame,  'Full body in frame',   'Full body not visible');
     applyCheck('check-distance', checks.goodDistance, 'Good distance',        'Adjust distance');
     applyCheck('check-lighting', checks.goodLighting, 'Adequate lighting',    'Improve lighting');
 
-    const viewEl = document.getElementById('check-view')!;
-    if (selectedView !== null) {
-      const label    = selectedView === 'sagittal' ? 'Side view' : 'Front view';
-      const autoOk   = checks.view === selectedView;
-      const suffix   = autoOk ? ' ✓' : ` — auto-detected ${checks.view === 'sagittal' ? 'side' : checks.view === 'frontal' ? 'front' : 'unknown'}`;
-      viewEl.textContent = `${label} (manual)${suffix}`;
-    } else {
-      const autoLabel = checks.view === 'sagittal' ? 'Side view'
-                      : checks.view === 'frontal'  ? 'Front view'
-                      : 'Detecting…';
-      viewEl.textContent = `View: ${autoLabel} (auto)`;
-    }
-
-    // Angle-specific positioning hint (overrides check hint if checks pass)
-    let hint = checks.hint;
-    if (checks.allPassed && selectedView === 'sagittal')
-      hint = 'Good! Stand perpendicular to the camera, hip-height lens, 3–5 m away.';
-    else if (checks.allPassed && selectedView === 'frontal')
-      hint = 'Good! Face the camera directly, chest-height lens, 3–5 m away.';
-    else if (!checks.hint && selectedView === 'sagittal')
-      hint = 'Side view: stand sideways so the camera sees your full profile.';
-    else if (!checks.hint && selectedView === 'frontal')
-      hint = 'Front view: face the camera directly, arms relaxed.';
-    document.getElementById('setup-hint')!.textContent = hint;
+    document.getElementById('setup-hint')!.textContent = checks.hint;
   }
 
   async function openCamera(): Promise<void> {
@@ -244,6 +248,14 @@ async function main() {
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
     (document.getElementById('playback-controls') as HTMLElement).style.display = 'none';
+    cameraColumnEl.style.display = 'flex';
+
+    // Clear any previously recorded video
+    if (recordedBlobUrl) {
+      URL.revokeObjectURL(recordedBlobUrl);
+      recordedBlobUrl = null;
+      video.removeAttribute('src');
+    }
 
     await startCamera(video);
 
@@ -279,7 +291,7 @@ async function main() {
 
           if (cameraState === 'setup') {
             setupConsecutiveFrames++;
-            const checks = evaluateSetupChecks(lms, setupConsecutiveFrames);
+            const checks = evaluateSetupChecks(lms, setupConsecutiveFrames, selectedView);
             refreshSetupUI(checks);
             drawSetupGuide(canvas, checks.allPassed);
             recordBtn.disabled = !checks.allPassed;
@@ -321,6 +333,7 @@ async function main() {
   function startRecording(): void {
     cameraState = 'recording';
     cameraFrames.length = 0;
+    recordedChunks.length = 0;
     recordBtn.classList.remove('ready');
     recordBtn.classList.add('recording');
     recordBtn.disabled = false;
@@ -335,21 +348,62 @@ async function main() {
       recTimerEl.textContent =
         `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     }, 1000);
+
+    // Start capturing the camera stream
+    const stream = video.srcObject as MediaStream | null;
+    if (stream && typeof MediaRecorder !== 'undefined') {
+      const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
+        .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+      try {
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.start(100);
+      } catch {
+        mediaRecorder = null;
+      }
+    }
   }
 
   function stopRecording(): void {
-    cameraState = 'setup';
+    const viewForAnalysis = selectedView;
+    const capturedFrames = [...cameraFrames];
+
+    cameraState = 'closed';
+    cameraRunning = false;
+    cancelAnimationFrame(cameraRafId);
     clearInterval(recTimerInterval);
     recIndicator.style.display = 'none';
     recordBtn.classList.remove('recording', 'ready');
-    recordBtn.disabled = true;
-    recordBtn.setAttribute('aria-label', 'Start recording');
-    viewModeBtn.style.display = 'flex';
-    setupConsecutiveFrames = 0;
-    lastLandmarkTime = performance.now();
-    showSetupPanel();
+    recordBtn.style.display = 'none';
+    viewModeBtn.style.display = 'none';
+    cameraOpenBtn.textContent = 'Camera';
+    showLivePanel();
 
-    runAnalysis([...cameraFrames], selectedView);
+    runAnalysis(capturedFrames, viewForAnalysis);
+
+    const finalize = (blobUrl: string | null): void => {
+      stopCamera(video);
+      if (blobUrl) {
+        if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
+        recordedBlobUrl = blobUrl;
+        video.src = blobUrl;
+        video.load();
+        (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
+      }
+    };
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.onstop = () => {
+        const blob = recordedChunks.length > 0
+          ? new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' })
+          : null;
+        finalize(blob ? URL.createObjectURL(blob) : null);
+      };
+      mediaRecorder.stop();
+    } else {
+      finalize(null);
+    }
+    mediaRecorder = null;
   }
 
   cameraOpenBtn.addEventListener('click', () => {
@@ -360,15 +414,16 @@ async function main() {
   function updateViewModeBtn(): void {
     if (selectedView === 'sagittal') {
       viewModeBtn.textContent = 'Side view';
-      viewModeBtn.classList.remove('view-front');
+      viewModeBtn.classList.remove('view-front', 'view-unset');
       viewModeBtn.classList.add('view-side');
     } else if (selectedView === 'frontal') {
       viewModeBtn.textContent = 'Front view';
-      viewModeBtn.classList.remove('view-side');
+      viewModeBtn.classList.remove('view-side', 'view-unset');
       viewModeBtn.classList.add('view-front');
     } else {
-      viewModeBtn.textContent = 'Auto view';
+      viewModeBtn.textContent = '⚠ Choose view';
       viewModeBtn.classList.remove('view-side', 'view-front');
+      viewModeBtn.classList.add('view-unset');
     }
   }
 
@@ -379,6 +434,8 @@ async function main() {
                  : selectedView === 'sagittal' ? 'frontal'
                  : null;
     updateViewModeBtn();
+    // Immediately refresh checklist so the view check updates without waiting for next frame
+    setupConsecutiveFrames = Math.max(0, setupConsecutiveFrames - 1); // force re-evaluation
   });
 
   recordBtn.addEventListener('click', () => {
