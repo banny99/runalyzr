@@ -2,6 +2,9 @@ import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 import { FPS_TARGET, FPS_SKIP_THRESHOLD, LANDMARKS } from '../config/defaults';
 import type { FrameData, LandmarkArray, CameraView } from '../analysis/types';
 
+// requestVideoFrameCallback (Safari 15.4+, Chrome 83+) fires exactly once per
+// decoded video frame — avoids processing duplicate frames and saves battery on iPad.
+
 export interface ProcessingController {
   start: () => void;
   stop: () => void;
@@ -32,18 +35,25 @@ export function createProcessingLoop(
   const frames: FrameData[] = [];
   let currentLandmarks: LandmarkArray | null = null;
 
-  function processFrame() {
+  // Use requestVideoFrameCallback when available — fires exactly once per decoded
+  // video frame (Safari 15.4+, Chrome 83+). Falls back to requestAnimationFrame.
+  const useVFC = typeof video.requestVideoFrameCallback === 'function';
+
+  function processFrame(now: DOMHighResTimeStamp) {
     if (!running) return;
 
-    const now = performance.now();
-    const elapsed = now - lastProcessTime;
-
     if (!video.paused && !video.ended && video.readyState >= 2) {
-      const targetInterval = 1000 / FPS_TARGET;
-      if (elapsed >= targetInterval) {
+      const elapsed = now - lastProcessTime;
+      // With VFC every callback is a new frame, so no interval gating needed.
+      // With rAF we still gate at FPS_TARGET to avoid over-processing.
+      const ready = useVFC || elapsed >= 1000 / FPS_TARGET;
+
+      if (ready) {
         currentFps = elapsed > 0 ? 1000 / elapsed : FPS_TARGET;
 
-        // Skip frame if performance is poor
+        // Skip every other frame when below threshold (rAF path only — VFC
+        // already guarantees one call per frame so skipping is less needed,
+        // but keep the guard for very slow devices)
         const shouldProcess =
           currentFps >= FPS_SKIP_THRESHOLD || frames.length % 2 === 0;
 
@@ -59,7 +69,11 @@ export function createProcessingLoop(
       }
     }
 
-    rafId = requestAnimationFrame(processFrame);
+    if (useVFC) {
+      rafId = video.requestVideoFrameCallback!(processFrame);
+    } else {
+      rafId = requestAnimationFrame(processFrame);
+    }
   }
 
   return {
@@ -68,11 +82,19 @@ export function createProcessingLoop(
       frames.length = 0;
       currentLandmarks = null;
       lastProcessTime = 0;
-      processFrame();
+      if (useVFC) {
+        rafId = video.requestVideoFrameCallback!(processFrame);
+      } else {
+        rafId = requestAnimationFrame(processFrame);
+      }
     },
     stop() {
       running = false;
-      cancelAnimationFrame(rafId);
+      if (useVFC) {
+        video.cancelVideoFrameCallback?.(rafId);
+      } else {
+        cancelAnimationFrame(rafId);
+      }
     },
     getFrames: () => frames,
     getCurrentLandmarks: () => currentLandmarks,

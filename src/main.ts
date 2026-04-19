@@ -251,7 +251,7 @@ async function main() {
     const findings   = generateFindings(results);
     lastResults          = results;
     lastAnalysisFrameUrl = overlay.captureDataUrl();
-    renderDashboard(results, findings);
+    renderDashboard(results, findings, view);
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
   }
 

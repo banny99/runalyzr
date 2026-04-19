@@ -1,21 +1,34 @@
-import { METRIC_LABELS } from '../config/defaults';
-import type { AnalysisResults, FindingItem } from '../analysis/types';
+import { METRIC_LABELS, SAGITTAL_METRICS, FRONTAL_METRICS } from '../config/defaults';
+import type { AnalysisResults, FindingItem, CameraView } from '../analysis/types';
 import { THRESHOLDS } from '../analysis/thresholds';
 
-export function renderDashboard(results: AnalysisResults, findings: FindingItem[]): void {
-  renderSummaryCards(results);
-  renderFindings(findings);
+function validMetricsForView(view: CameraView): Set<string> | null {
+  if (view === 'sagittal') return SAGITTAL_METRICS;
+  if (view === 'frontal')  return FRONTAL_METRICS;
+  return null; // unknown → show all
+}
+
+export function renderDashboard(
+  results: AnalysisResults,
+  findings: FindingItem[],
+  view: CameraView = 'unknown',
+): void {
+  renderSummaryCards(results, view);
+  renderFindings(findings, view);
   const exportBtn = document.getElementById('export-pdf');
   if (exportBtn) exportBtn.removeAttribute('disabled');
 }
 
-export function renderSummaryCards(results: AnalysisResults): void {
+export function renderSummaryCards(results: AnalysisResults, view: CameraView = 'unknown'): void {
   const container = document.getElementById('summary-cards');
   if (!container) return;
   container.innerHTML = '';
 
+  const valid = validMetricsForView(view);
+
   for (const [key, result] of Object.entries(results) as [keyof AnalysisResults, typeof results[keyof AnalysisResults]][]) {
     if (!result) continue;
+    if (valid && !valid.has(key)) continue; // skip metrics not valid for this view
 
     const threshold = THRESHOLDS[key];
     const card = document.createElement('div');
@@ -39,17 +52,20 @@ export function renderSummaryCards(results: AnalysisResults): void {
   }
 }
 
-export function renderFindings(findings: FindingItem[]): void {
+export function renderFindings(findings: FindingItem[], view: CameraView = 'unknown'): void {
   const container = document.getElementById('findings-list');
   if (!container) return;
   container.innerHTML = '';
 
-  if (findings.length === 0) {
+  const valid = validMetricsForView(view);
+  const filtered = valid ? findings.filter(f => valid.has(f.metric)) : findings;
+
+  if (filtered.length === 0) {
     container.innerHTML = '<p style="color:#666;font-size:0.875rem;">No issues detected.</p>';
     return;
   }
 
-  for (const finding of findings) {
+  for (const finding of filtered) {
     const item = document.createElement('div');
     item.className = `finding-item ${finding.status}`;
     item.textContent = finding.text;

@@ -42,6 +42,16 @@ export const METRIC_LABELS: Record<string, string> = {
   groundContactTime: 'Ground Contact Time',
 };
 
+/** Metrics meaningful for each camera view. Stride symmetry applies to both. */
+export const SAGITTAL_METRICS = new Set([
+  'kneeFlexionAtContact', 'ankleDorsiflexion', 'cadence',
+  'verticalOscillation', 'overstriding', 'groundContactTime', 'strideSymmetry',
+]);
+
+export const FRONTAL_METRICS = new Set([
+  'pelvicDrop', 'hipAdduction', 'trunkLateralLean', 'strideSymmetry',
+]);
+
 export const APP_NAME = 'Runalyzr';
 
 export const MEDIAPIPE_CDN = `${import.meta.env.BASE_URL}wasm`;
