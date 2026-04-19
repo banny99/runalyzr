@@ -118,10 +118,16 @@ export function calculateHipAdduction(
 export function calculateVerticalOscillation(frames: FrameData[]): number | null {
   if (frames.length < 2) return null;
   const L = LANDMARKS;
-  const midYs = frames.map((f) => (f.landmarks[L.LEFT_HIP].y + f.landmarks[L.RIGHT_HIP].y) / 2);
-  const ys = midYs.filter((y) => y > 0);
-  if (ys.length < 2) return null;
-  return (Math.max(...ys) - Math.min(...ys)) * 100;
+  const midYs = frames
+    .map((f) => {
+      const lh = f.landmarks[L.LEFT_HIP];
+      const rh = f.landmarks[L.RIGHT_HIP];
+      if (!lh || !rh) return null;
+      return (lh.y + rh.y) / 2;
+    })
+    .filter((y): y is number => y !== null && y > 0);
+  if (midYs.length < 2) return null;
+  return (Math.max(...midYs) - Math.min(...midYs)) * 100;
 }
 
 export function calculateOverstriding(
@@ -212,13 +218,21 @@ export function calculateAllMetrics(
     ? (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000
     : 0;
 
-  const symmetry = calculateStrideSymmetry(leftKnee, rightKnee);
+  // Stride symmetry: average of all available bilateral metric pairs
+  const symmetryValues = [
+    calculateStrideSymmetry(leftKnee, rightKnee),
+    calculateStrideSymmetry(leftAnkle, rightAnkle),
+    calculateStrideSymmetry(leftOver, rightOver),
+  ].filter((v): v is number => v !== null);
+  const symmetry = symmetryValues.length > 0
+    ? symmetryValues.reduce((a, b) => a + b, 0) / symmetryValues.length
+    : null;
 
   return {
     kneeFlexionAtContact: toResult(avgKnee, 'kneeFlexionAtContact'),
     hipAdduction: toResult(avgHipAdd, 'hipAdduction'),
     pelvicDrop: isFrontal ? toResult(calculatePelvicDrop(frames, events), 'pelvicDrop') : null,
-    trunkLateralLean: toResult(calculateTrunkLateralLean(frames, events), 'trunkLateralLean'),
+    trunkLateralLean: isFrontal ? toResult(calculateTrunkLateralLean(frames, events), 'trunkLateralLean') : null,
     ankleDorsiflexion: toResult(avgAnkle, 'ankleDorsiflexion'),
     cadence: toResult(cadenceValue(events, durationSeconds), 'cadence'),
     verticalOscillation: toResult(calculateVerticalOscillation(frames), 'verticalOscillation'),

@@ -216,7 +216,15 @@ async function main() {
   const liveMetricsEl    = document.getElementById('live-metrics')     as HTMLElement;
   const setupGuidanceEl  = document.getElementById('setup-guidance')   as HTMLElement;
 
-  const landmarker = await initLandmarker();
+  let landmarker: Awaited<ReturnType<typeof initLandmarker>>;
+  try {
+    landmarker = await initLandmarker();
+  } catch (err) {
+    loadingEl.textContent = '⚠ Failed to load pose model. Check your connection and reload.';
+    loadingEl.style.cssText += '; color:#ef4444; background:#1a1a1a; padding:1rem; border-radius:8px;';
+    console.error('initLandmarker failed:', err);
+    return;
+  }
   loadingEl.remove();
 
   const overlay = initOverlay(canvas, video);
@@ -429,7 +437,10 @@ async function main() {
             recordBtn.disabled = !checks.allPassed;
             recordBtn.classList.toggle('ready', checks.allPassed);
           } else if (cameraState === 'recording') {
-            cameraFrames.push({ landmarks: lms, timestamp: performance.now() });
+            // Cap at ~5 min @ 30fps to avoid memory issues on iPad
+            if (cameraFrames.length < 9000) {
+              cameraFrames.push({ landmarks: lms, timestamp: performance.now() });
+            }
             updateLiveMetrics(null, detectCameraView(lms), 30);
           }
         } else if (cameraState === 'setup' && performance.now() - lastLandmarkTime > 500) {
