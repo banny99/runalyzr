@@ -14,11 +14,13 @@ import type { LandmarkArray, AnalysisResults, MetricStatus, FrameData, CameraVie
 
 interface SetupChecks {
   viewSelected: boolean;
-  orientation: boolean;   // person is turned the right way for the chosen view
+  stable: boolean;
+  orientation: boolean;     // turned the right way for the chosen view
+  jointAlignment: boolean;  // sagittal: hip/knee/ankle stack in X; frontal: bilateral symmetry
   bodyInFrame: boolean;
   goodDistance: boolean;
+  cameraPosition: boolean;  // sagittal: hip-height; frontal: centered + level
   goodLighting: boolean;
-  stable: boolean;
   detectedView: CameraView;
   allPassed: boolean;
   hint: string;
@@ -37,48 +39,93 @@ function evaluateSetupChecks(
     L.LEFT_ANKLE, L.RIGHT_ANKLE,
   ];
 
-  // All key joints clearly inside frame (not clipped to edge)
-  const bodyInFrame = key.every((i) => {
-    const lm = landmarks[i];
-    return lm && lm.x > 0.03 && lm.x < 0.97 && lm.y > 0.02 && lm.y < 0.98;
-  });
+  // ── Stable ────────────────────────────────────────────────────────────────
+  const stable = consecutiveFrames >= 15;
 
-  // Orientation: are left/right joint pairs stacked (sagittal) or spread (frontal)?
-  // Use shoulder and hip spread as the signal.
-  const shoulderSpread = Math.abs(landmarks[L.LEFT_SHOULDER].x - landmarks[L.RIGHT_SHOULDER].x);
-  const hipSpread      = Math.abs(landmarks[L.LEFT_HIP].x      - landmarks[L.RIGHT_HIP].x);
-  const avgSpread = (shoulderSpread + hipSpread) / 2;
-  // Sagittal: joints stack → spread < 0.12; Frontal: joints spread → spread > 0.12
+  // ── Shared geometry ───────────────────────────────────────────────────────
+  const lShoulder = landmarks[L.LEFT_SHOULDER];
+  const rShoulder = landmarks[L.RIGHT_SHOULDER];
+  const lHip      = landmarks[L.LEFT_HIP];
+  const rHip      = landmarks[L.RIGHT_HIP];
+  const lKnee     = landmarks[L.LEFT_KNEE];
+  const rKnee     = landmarks[L.RIGHT_KNEE];
+  const lAnkle    = landmarks[L.LEFT_ANKLE];
+  const rAnkle    = landmarks[L.RIGHT_ANKLE];
+
+  const shoulderSpread = Math.abs(lShoulder.x - rShoulder.x);
+  const hipSpread      = Math.abs(lHip.x      - rHip.x);
+  const avgSpread      = (shoulderSpread + hipSpread) / 2;
+
+  const shoulderMidX = (lShoulder.x + rShoulder.x) / 2;
+  const hipMidX      = (lHip.x      + rHip.x)      / 2;
+  const hipMidY      = (lHip.y      + rHip.y)      / 2;
+
+  const shoulderY  = Math.min(lShoulder.y, rShoulder.y);
+  const ankleY     = Math.max(lAnkle.y,    rAnkle.y);
+  const heightSpan = ankleY - shoulderY;
+
+  // ── Orientation (are they facing the right way?) ──────────────────────────
+  // Sagittal: joints stack in X → low spread; Frontal: joints spread in X
   const orientation =
     selectedView === null       ? true :
     selectedView === 'sagittal' ? avgSpread < 0.14 :
     /* frontal */                 avgSpread > 0.10;
 
-  // Distance:
-  //   Sagittal — shoulder-to-ankle height should fill 40–85 % of frame
-  //   Frontal  — shoulder width should fill 20–60 % of frame width
-  const shoulderY = Math.min(landmarks[L.LEFT_SHOULDER].y, landmarks[L.RIGHT_SHOULDER].y);
-  const ankleY    = Math.max(landmarks[L.LEFT_ANKLE].y,    landmarks[L.RIGHT_ANKLE].y);
-  const heightSpan = ankleY - shoulderY;
-  let goodDistance: boolean;
-  if (selectedView === 'frontal') {
-    goodDistance = shoulderSpread > 0.20 && shoulderSpread < 0.60;
-  } else {
-    // sagittal or unset — use height span
-    goodDistance = heightSpan > 0.40 && heightSpan < 0.90;
+  // ── Joint alignment (view-specific quality signal) ────────────────────────
+  let jointAlignment = true;
+  if (selectedView === 'sagittal' && orientation) {
+    // Hip, knee, ankle should be roughly at the same X (person truly perpendicular).
+    // Use whichever side is more visible (lower x = left side closer to camera, etc.)
+    const leftAlign  = Math.max(
+      Math.abs(lHip.x - lKnee.x), Math.abs(lKnee.x - lAnkle.x));
+    const rightAlign = Math.max(
+      Math.abs(rHip.x - rKnee.x), Math.abs(rKnee.x - rAnkle.x));
+    const bestAlign = Math.min(leftAlign, rightAlign);
+    jointAlignment = bestAlign < 0.18; // joints within 18% horizontal scatter
+  } else if (selectedView === 'frontal' && orientation) {
+    // Left and right counterparts should mirror around the body midline.
+    // midline X ≈ average of all mid-points
+    const midX = (shoulderMidX + hipMidX) / 2;
+    const lSymmetry = Math.abs((lShoulder.x - midX) + (rShoulder.x - midX));
+    const hSymmetry = Math.abs((lHip.x      - midX) + (rHip.x      - midX));
+    jointAlignment = Math.max(lSymmetry, hSymmetry) < 0.12; // fairly symmetric
   }
 
-  // Lighting: average landmark visibility (MediaPipe provides 0–1 per landmark)
+  // ── Body in frame ─────────────────────────────────────────────────────────
+  const bodyInFrame = key.every((i) => {
+    const lm = landmarks[i];
+    return lm && lm.x > 0.03 && lm.x < 0.97 && lm.y > 0.02 && lm.y < 0.98;
+  });
+
+  // ── Distance ──────────────────────────────────────────────────────────────
+  // Sagittal: height span fills 40–88% of frame
+  // Frontal:  shoulder width fills 20–60% of frame width
+  const goodDistance =
+    selectedView === 'frontal'
+      ? shoulderSpread > 0.20 && shoulderSpread < 0.60
+      : heightSpan > 0.40 && heightSpan < 0.88;
+
+  // ── Camera position ───────────────────────────────────────────────────────
+  // Sagittal: camera should be at roughly hip height → hip mid-Y near vertical centre
+  // Frontal:  person centred horizontally + camera level (shoulders horizontal)
+  let cameraPosition = true;
+  if (selectedView === 'sagittal') {
+    cameraPosition = hipMidY > 0.38 && hipMidY < 0.68;
+  } else if (selectedView === 'frontal') {
+    const centred = Math.abs(hipMidX - 0.5) < 0.15;
+    const tilt    = Math.abs(lShoulder.y - rShoulder.y) < 0.06; // shoulders level
+    cameraPosition = centred && tilt;
+  }
+
+  // ── Lighting ──────────────────────────────────────────────────────────────
   const visAvg = key.reduce((s, i) => s + (landmarks[i]?.visibility ?? 1), 0) / key.length;
   const goodLighting = visAvg > 0.50;
 
-  // Stable: landmark detected in ≥ 15 consecutive frames (~0.5 s at 30 fps)
-  const stable = consecutiveFrames >= 15;
-
+  // ── Detected view ─────────────────────────────────────────────────────────
   const detectedView = detectCameraView(landmarks);
   const viewSelected = selectedView !== null;
 
-  // Build the most actionable hint (first unmet condition wins)
+  // ── Hint (first unmet condition wins) ────────────────────────────────────
   let hint = '';
   if (!viewSelected) {
     hint = 'Tap the view button above to choose Side or Front view.';
@@ -88,36 +135,40 @@ function evaluateSetupChecks(
     hint = selectedView === 'sagittal'
       ? 'Turn sideways — camera should see your full profile (hip, knee, ankle in a line).'
       : 'Face the camera directly — shoulders should be level and spread.';
+  } else if (!jointAlignment) {
+    hint = selectedView === 'sagittal'
+      ? 'Rotate a bit more — hip, knee and ankle should line up vertically.'
+      : 'Centre yourself — left and right sides should mirror each other.';
   } else if (!bodyInFrame) {
     hint = selectedView === 'sagittal'
       ? 'Step back until your full body (head to feet) is visible from the side.'
-      : 'Step back until your full body (head to feet) is visible facing the camera.';
-  } else if (selectedView === 'frontal' && shoulderSpread < 0.20) {
-    hint = 'Move closer — shoulder width should fill more of the frame.';
-  } else if (selectedView === 'frontal' && shoulderSpread > 0.60) {
-    hint = 'Step further back — you are too close to the camera.';
-  } else if (heightSpan < 0.40 && selectedView !== 'frontal') {
+      : 'Step back until your full body (head to feet) is visible facing forward.';
+  } else if (selectedView === 'frontal' ? shoulderSpread < 0.20 : heightSpan < 0.40) {
     hint = 'Move closer to the camera.';
-  } else if (heightSpan > 0.90) {
+  } else if (selectedView === 'frontal' ? shoulderSpread > 0.60 : heightSpan > 0.88) {
     hint = 'Step further back — you are too close.';
+  } else if (!cameraPosition) {
+    hint = selectedView === 'sagittal'
+      ? `Camera too ${hipMidY < 0.38 ? 'low' : 'high'} — raise or lower it to hip height.`
+      : Math.abs(hipMidX - 0.5) >= 0.15
+        ? `Move ${hipMidX < 0.5 ? 'right' : 'left'} — centre yourself in the frame.`
+        : 'Camera is tilted — level it so shoulders appear horizontal.';
   } else if (!goodLighting) {
     hint = 'Improve lighting: face a bright light source or move outdoors.';
   } else {
     hint = selectedView === 'sagittal'
-      ? 'All set! Camera at hip height, 3–5 m away. Start recording when ready.'
-      : 'All set! Camera at chest height, 3–5 m away. Start recording when ready.';
+      ? 'All set — camera at hip height, 3–5 m away. Start recording when ready.'
+      : 'All set — camera at chest height, 3–5 m away. Start recording when ready.';
   }
 
+  const allPassed =
+    viewSelected && stable && orientation && jointAlignment &&
+    bodyInFrame && goodDistance && cameraPosition && goodLighting;
+
   return {
-    viewSelected,
-    orientation,
-    bodyInFrame,
-    goodDistance,
-    goodLighting,
-    stable,
-    detectedView,
-    allPassed: viewSelected && orientation && bodyInFrame && goodDistance && goodLighting && stable,
-    hint,
+    viewSelected, stable, orientation, jointAlignment,
+    bodyInFrame, goodDistance, cameraPosition, goodLighting,
+    detectedView, allPassed, hint,
   };
 }
 
@@ -264,37 +315,62 @@ async function main() {
   }
 
   function refreshSetupUI(checks: SetupChecks): void {
-    // View check: pass once selected, with detected-view context
+    const isSag = selectedView === 'sagittal';
+    const notReady = (dep: boolean) => !checks.viewSelected || !checks.stable || !dep;
+
+    // View
     if (checks.viewSelected) {
-      const label = selectedView === 'sagittal' ? 'Side view' : 'Front view';
+      const label    = isSag ? 'Side view' : 'Front view';
       const mismatch = checks.detectedView !== selectedView && checks.detectedView !== 'unknown';
-      const detected = mismatch
+      const suffix   = mismatch
         ? ` (camera sees ${checks.detectedView === 'sagittal' ? 'side' : 'front'})`
         : '';
-      applyCheck('check-view', !mismatch, `${label} selected${detected}`, `${label} selected${detected}`);
+      applyCheck('check-view', !mismatch, `${label} selected${suffix}`, `${label} selected${suffix}`);
     } else {
       applyCheck('check-view', false, '', 'Choose view (tap button above)');
     }
 
+    // Stable
     applyCheck('check-stable', checks.stable, 'Pose detected', 'Detecting pose…', !checks.stable);
 
-    // Orientation: label depends on chosen view
-    const orientPass = selectedView === 'sagittal' ? 'Sideways to camera'   : 'Facing camera';
-    const orientFail = selectedView === 'sagittal' ? 'Turn sideways'         : 'Face the camera';
-    applyCheck('check-orientation', checks.orientation, orientPass, orientFail,
-               !checks.viewSelected || !checks.stable);
+    // Orientation
+    applyCheck('check-orientation',
+      checks.orientation,
+      isSag ? 'Sideways to camera' : 'Facing camera',
+      isSag ? 'Turn sideways'      : 'Face the camera',
+      notReady(true));
 
-    // Body in frame: label depends on chosen view
-    const bodyPass = selectedView === 'frontal' ? 'Full body visible (front)' : 'Full body in frame';
-    const bodyFail = selectedView === 'frontal' ? 'Full body not visible'     : 'Full body not visible';
-    applyCheck('check-body', checks.bodyInFrame, bodyPass, bodyFail);
+    // Joint alignment
+    applyCheck('check-alignment',
+      checks.jointAlignment,
+      isSag ? 'Hip–knee–ankle aligned' : 'Bilateral symmetry OK',
+      isSag ? 'Rotate more — joints not aligned' : 'Off-centre or asymmetric',
+      notReady(checks.orientation));
 
-    // Distance: label depends on chosen view
-    const distPass = selectedView === 'frontal' ? 'Good width coverage' : 'Good distance';
-    const distFail = selectedView === 'frontal' ? 'Adjust distance (width)' : 'Adjust distance';
-    applyCheck('check-distance', checks.goodDistance, distPass, distFail);
+    // Body in frame
+    applyCheck('check-body',
+      checks.bodyInFrame,
+      isSag ? 'Full body in frame (side)' : 'Full body in frame (front)',
+      'Full body not visible',
+      notReady(checks.orientation));
 
-    applyCheck('check-lighting', checks.goodLighting, 'Adequate lighting', 'Improve lighting');
+    // Distance
+    applyCheck('check-distance',
+      checks.goodDistance,
+      isSag ? 'Good distance'        : 'Good width coverage',
+      isSag ? 'Adjust distance'      : 'Adjust distance (width)',
+      notReady(checks.orientation));
+
+    // Camera position
+    applyCheck('check-camera-pos',
+      checks.cameraPosition,
+      isSag ? 'Camera at hip height'      : 'Centred & level',
+      isSag ? 'Adjust camera height'      : 'Centre yourself / level camera',
+      notReady(checks.orientation && checks.bodyInFrame && checks.goodDistance));
+
+    // Lighting
+    applyCheck('check-lighting',
+      checks.goodLighting, 'Adequate lighting', 'Improve lighting');
 
     document.getElementById('setup-hint')!.textContent = checks.hint;
   }
