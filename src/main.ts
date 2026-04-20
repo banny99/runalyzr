@@ -388,6 +388,7 @@ async function main() {
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
     (document.getElementById('playback-controls') as HTMLElement).style.display = 'none';
+    (document.getElementById('download-recording') as HTMLAnchorElement).style.display = 'none';
     cameraColumnEl.style.display = 'flex';
 
     // Clear any previously recorded video
@@ -536,6 +537,10 @@ async function main() {
         video.src = blobUrl;
         video.load();
         (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
+        const dl = document.getElementById('download-recording') as HTMLAnchorElement;
+        dl.href = blobUrl;
+        dl.download = `run-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.webm`;
+        dl.style.display = 'inline-block';
       }
     };
 
