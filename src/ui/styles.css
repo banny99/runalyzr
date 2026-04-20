@@ -20,7 +20,7 @@ body {
 
 #upload-controls { display: flex; gap: 0.5rem; align-items: center; margin-left: auto; }
 
-#upload-label, button {
+#upload-label, button, #download-recording {
   padding: 0.4rem 0.9rem;
   border-radius: 6px;
   border: 1px solid #444;
@@ -29,7 +29,8 @@ body {
   cursor: pointer;
   font-size: 0.875rem;
 }
-#upload-label:hover, button:hover:not(:disabled) { background: #333; }
+#upload-label:hover, button:hover:not(:disabled), #download-recording:hover { background: #333; }
+#download-recording { text-decoration: none; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 #file-input { display: none; }
 
