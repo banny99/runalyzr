@@ -99,6 +99,25 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   white-space: nowrap;
 }
 #view-mode-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.75) !important; }
+
+#toggle-overlay {
+  position: absolute;
+  bottom: 0.6rem;
+  right: 0.6rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.65rem !important;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s;
+}
+#toggle-overlay:hover:not(:disabled) { background: rgba(0, 0, 0, 0.75) !important; }
 #view-mode-btn.view-front  { border-color: rgba(251, 191, 36, 0.6) !important; color: #fbbf24; }
 #view-mode-btn.view-side   { border-color: rgba(34, 197, 94, 0.6)  !important; color: #22c55e; }
 #view-mode-btn.view-unset  { border-color: rgba(251, 191, 36, 0.8) !important; color: #fbbf24;
