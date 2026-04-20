@@ -48,12 +48,12 @@ describe('midpoint', () => {
 
 describe('verticalDisplacement', () => {
   it('returns peak-to-peak y displacement × 100 in cm', () => {
-    const makeFrame = (y: number): FrameData => ({
-      timestamp: 0,
-      landmarks: Array(33).fill(null).map((_, i) =>
+    const makeFrame = (y: number): FrameData => {
+      const lms = Array(33).fill(null).map((_, i) =>
         i === 23 ? lm(0.5, y) : lm(0.5, 0.5)
-      ),
-    });
+      );
+      return { timestamp: 0, landmarks: lms, worldLandmarks: lms };
+    };
     const frames: FrameData[] = [
       makeFrame(0.4), makeFrame(0.5), makeFrame(0.6),
       makeFrame(0.5), makeFrame(0.4),

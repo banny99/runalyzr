@@ -5,11 +5,11 @@ export function angleBetweenThreePoints(
   b: Landmark,
   c: Landmark,
 ): number {
-  const ba = { x: a.x - b.x, y: a.y - b.y };
-  const bc = { x: c.x - b.x, y: c.y - b.y };
-  const dot = ba.x * bc.x + ba.y * bc.y;
-  const magBa = Math.sqrt(ba.x ** 2 + ba.y ** 2);
-  const magBc = Math.sqrt(bc.x ** 2 + bc.y ** 2);
+  const ba = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+  const bc = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
+  const dot = ba.x * bc.x + ba.y * bc.y + ba.z * bc.z;
+  const magBa = Math.sqrt(ba.x ** 2 + ba.y ** 2 + ba.z ** 2);
+  const magBc = Math.sqrt(bc.x ** 2 + bc.y ** 2 + bc.z ** 2);
   if (magBa === 0 || magBc === 0) return 0;
   const cosAngle = Math.max(-1, Math.min(1, dot / (magBa * magBc)));
   return (Math.acos(cosAngle) * 180) / Math.PI;

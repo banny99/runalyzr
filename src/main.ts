@@ -439,7 +439,11 @@ async function main() {
           } else if (cameraState === 'recording') {
             // Cap at ~5 min @ 30fps to avoid memory issues on iPad
             if (cameraFrames.length < 9000) {
-              cameraFrames.push({ landmarks: lms, timestamp: performance.now() });
+              cameraFrames.push({
+                landmarks: lms,
+                worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+                timestamp: performance.now(),
+              });
             }
             updateLiveMetrics(null, detectCameraView(lms), 30);
           }

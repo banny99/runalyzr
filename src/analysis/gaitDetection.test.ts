@@ -4,12 +4,12 @@ import type { FrameData, GaitEvent, Landmark } from './types';
 
 function makeFrames(ankleYValues: number[], leftAnkle = true): FrameData[] {
   const ankleIdx = leftAnkle ? 27 : 28;
-  return ankleYValues.map((y, i) => ({
-    timestamp: i * (1000 / 30),
-    landmarks: Array(33).fill(null).map((_, li): Landmark => ({
+  return ankleYValues.map((y, i) => {
+    const lms = Array(33).fill(null).map((_, li): Landmark => ({
       x: 0.5, y: li === ankleIdx ? y : 0.5, z: 0, visibility: 1,
-    })),
-  }));
+    }));
+    return { timestamp: i * (1000 / 30), landmarks: lms, worldLandmarks: lms };
+  });
 }
 
 describe('detectGaitEvents', () => {

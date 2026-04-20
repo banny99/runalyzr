@@ -23,7 +23,7 @@ export function calculateKneeFlexionAtContact(
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
     .map((f) =>
-      angleBetweenThreePoints(f.landmarks[hipIdx], f.landmarks[kneeIdx], f.landmarks[ankleIdx])
+      angleBetweenThreePoints(f.worldLandmarks[hipIdx], f.worldLandmarks[kneeIdx], f.worldLandmarks[ankleIdx])
     );
   return angles.reduce((a, b) => a + b, 0) / angles.length;
 }
@@ -45,7 +45,7 @@ export function calculateAnkleDorsiflexion(
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
     .map((f) =>
-      angleBetweenThreePoints(f.landmarks[kneeIdx], f.landmarks[ankleIdx], f.landmarks[footIdx])
+      angleBetweenThreePoints(f.worldLandmarks[kneeIdx], f.worldLandmarks[ankleIdx], f.worldLandmarks[footIdx])
     );
   const avg = angles.reduce((a, b) => a + b, 0) / angles.length;
   return 180 - avg; // supplementary angle = dorsiflexion degrees
@@ -63,8 +63,8 @@ export function calculateTrunkLateralLean(
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
     .map((f) => {
-      const shoulderMid = midpoint(f.landmarks[L.LEFT_SHOULDER], f.landmarks[L.RIGHT_SHOULDER]);
-      const hipMid = midpoint(f.landmarks[L.LEFT_HIP], f.landmarks[L.RIGHT_HIP]);
+      const shoulderMid = midpoint(f.worldLandmarks[L.LEFT_SHOULDER], f.worldLandmarks[L.RIGHT_SHOULDER]);
+      const hipMid = midpoint(f.worldLandmarks[L.LEFT_HIP], f.worldLandmarks[L.RIGHT_HIP]);
       return lateralAngle(shoulderMid, hipMid);
     });
   return leans.reduce((a, b) => a + b, 0) / leans.length;
@@ -81,8 +81,8 @@ export function calculatePelvicDrop(
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
     .map((f) => {
-      const lh = f.landmarks[LANDMARKS.LEFT_HIP];
-      const rh = f.landmarks[LANDMARKS.RIGHT_HIP];
+      const lh = f.worldLandmarks[LANDMARKS.LEFT_HIP];
+      const rh = f.worldLandmarks[LANDMARKS.RIGHT_HIP];
       return Math.abs(lh.y - rh.y) * 100;
     });
   return drops.reduce((a, b) => a + b, 0) / drops.length;
@@ -106,9 +106,9 @@ export function calculateHipAdduction(
     .filter(Boolean)
     .map((f) =>
       angleBetweenThreePoints(
-        f.landmarks[otherHipIdx],
-        f.landmarks[stanceHipIdx],
-        f.landmarks[kneeIdx],
+        f.worldLandmarks[otherHipIdx],
+        f.worldLandmarks[stanceHipIdx],
+        f.worldLandmarks[kneeIdx],
       )
     )
     .map((a) => Math.abs(90 - a));
@@ -145,7 +145,7 @@ export function calculateOverstriding(
   const distances = footstrikes
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
-    .map((f) => (f.landmarks[ankleIdx].x - f.landmarks[hipIdx].x) * 100);
+    .map((f) => (f.worldLandmarks[ankleIdx].x - f.worldLandmarks[hipIdx].x) * 100);
   return distances.reduce((a, b) => a + b, 0) / distances.length;
 }
 

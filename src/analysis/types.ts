@@ -10,6 +10,7 @@ export type LandmarkArray = Landmark[];
 export interface FrameData {
   timestamp: number; // ms, from performance.now()
   landmarks: LandmarkArray;
+  worldLandmarks: LandmarkArray; // true 3D metres, origin at hip centre, rotation-normalised
 }
 
 export type GaitEventType = 'footstrike' | 'toe_off';
