@@ -213,6 +213,26 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 #record-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 #record-btn:hover:not(:disabled) { background: transparent !important; }
 
+/* ── Playback controls ─────────────────────────────────────────────────── */
+
+#playback-controls {
+  display: none;
+  width: 100%;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+#speed-select {
+  background: #2a2a2a;
+  color: #f0f0f0;
+  border: 1px solid #444;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
 /* ── Sidebar panels ────────────────────────────────────────────────────── */
 
 #live-metrics,
