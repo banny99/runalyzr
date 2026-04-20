@@ -601,6 +601,7 @@ async function main() {
     const isVisible = canvas.style.display !== 'none';
     overlay.setVisible(!isVisible);
     canvas.style.display = isVisible ? 'none' : '';
+    toggleOverlayBtn.classList.toggle('overlay-off', isVisible);
   });
 
   exportPdfBtn.addEventListener('click', async () => {
