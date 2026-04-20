@@ -17,13 +17,14 @@
       <label id="upload-label" for="file-input">Upload Video</label>
       <input type="file" id="file-input" accept="video/mp4,video/quicktime" />
       <button id="camera-open-btn">Camera</button>
-      <button id="toggle-overlay">Toggle Overlay</button>
     </div>
   </header>
 
   <div id="playback-controls" style="display:none; padding: 0.5rem 1rem; background:#1a1a1a; gap:0.5rem; align-items:center; border-bottom: 1px solid #333; flex-wrap: wrap;">
+    <button id="play-pause">▶</button>
     <button id="frame-back">← Frame</button>
     <button id="frame-forward">Frame →</button>
+    <a id="download-recording" style="display:none">⬇ Save Video</a>
     <select id="speed-select" style="background:#2a2a2a;color:#f0f0f0;border:1px solid #444;padding:0.35rem 0.5rem;border-radius:6px;font-size:0.875rem;">
       <option value="0.25">0.25×</option>
       <option value="0.5">0.5×</option>
@@ -40,6 +41,7 @@
           <canvas id="overlay"></canvas>
           <!-- View mode selector — shown only during camera setup -->
           <button id="view-mode-btn" aria-label="Select camera angle" title="Select camera angle">Side</button>
+          <button id="toggle-overlay" title="Toggle skeleton overlay">Overlay</button>
           <!-- REC indicator — shown only while recording -->
           <div id="rec-indicator">
             <span class="rec-dot"></span>

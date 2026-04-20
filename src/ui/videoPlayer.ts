@@ -23,15 +23,34 @@ export function initVideoPlayer(
   video.addEventListener('seeked', callbacks.onSeeked);
   video.addEventListener('loadedmetadata', callbacks.onLoadedMetadata);
 
-  // Show playback controls when video is loaded
+  // Show playback controls only for file video, not camera stream
   video.addEventListener('loadedmetadata', () => {
+    if (video.srcObject) return;
     const controls = document.getElementById('playback-controls');
     if (controls) controls.style.display = 'flex';
   });
 
+  const playPauseBtn = document.getElementById('play-pause') as HTMLButtonElement | null;
   const frameBackBtn = document.getElementById('frame-back') as HTMLButtonElement | null;
   const frameForwardBtn = document.getElementById('frame-forward') as HTMLButtonElement | null;
   const speedSelect = document.getElementById('speed-select') as HTMLSelectElement | null;
+
+  function syncPlayPause(): void {
+    if (playPauseBtn) playPauseBtn.textContent = video.paused ? '▶' : '⏸';
+  }
+
+  playPauseBtn?.addEventListener('click', () => {
+    if (video.paused) {
+      if (video.ended) video.currentTime = 0;
+      video.play();
+    } else {
+      video.pause();
+    }
+  });
+
+  video.addEventListener('play', syncPlayPause);
+  video.addEventListener('pause', syncPlayPause);
+  video.addEventListener('ended', syncPlayPause);
 
   frameBackBtn?.addEventListener('click', () => {
     video.pause();

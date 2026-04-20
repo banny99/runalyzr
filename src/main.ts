@@ -388,6 +388,7 @@ async function main() {
     cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
     (document.getElementById('playback-controls') as HTMLElement).style.display = 'none';
+    (document.getElementById('download-recording') as HTMLAnchorElement).style.display = 'none';
     cameraColumnEl.style.display = 'flex';
 
     // Clear any previously recorded video
@@ -439,7 +440,11 @@ async function main() {
           } else if (cameraState === 'recording') {
             // Cap at ~5 min @ 30fps to avoid memory issues on iPad
             if (cameraFrames.length < 9000) {
-              cameraFrames.push({ landmarks: lms, timestamp: performance.now() });
+              cameraFrames.push({
+                landmarks: lms,
+                worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+                timestamp: performance.now(),
+              });
             }
             updateLiveMetrics(null, detectCameraView(lms), 30);
           }
@@ -532,6 +537,10 @@ async function main() {
         video.src = blobUrl;
         video.load();
         (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
+        const dl = document.getElementById('download-recording') as HTMLAnchorElement;
+        dl.href = blobUrl;
+        dl.download = `run-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.webm`;
+        dl.style.display = 'inline-block';
       }
     };
 

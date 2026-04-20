@@ -61,7 +61,11 @@ export function createProcessingLoop(
           const result = landmarker.detectForVideo(video, now);
           if (result.landmarks.length > 0) {
             currentLandmarks = result.landmarks[0] as LandmarkArray;
-            frames.push({ timestamp: now, landmarks: currentLandmarks });
+            frames.push({
+              timestamp: now,
+              landmarks: currentLandmarks,
+              worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+            });
             onFrame(currentLandmarks, now);
           }
         }
