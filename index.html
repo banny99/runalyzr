@@ -20,18 +20,6 @@
     </div>
   </header>
 
-  <div id="playback-controls" style="display:none; padding: 0.5rem 1rem; background:#1a1a1a; gap:0.5rem; align-items:center; border-bottom: 1px solid #333; flex-wrap: wrap;">
-    <button id="play-pause">▶</button>
-    <button id="frame-back">← Frame</button>
-    <button id="frame-forward">Frame →</button>
-    <a id="download-recording" style="display:none">⬇ Save Video</a>
-    <select id="speed-select" style="background:#2a2a2a;color:#f0f0f0;border:1px solid #444;padding:0.35rem 0.5rem;border-radius:6px;font-size:0.875rem;">
-      <option value="0.25">0.25×</option>
-      <option value="0.5">0.5×</option>
-      <option value="1" selected>1×</option>
-    </select>
-  </div>
-
   <main>
     <section id="video-section">
       <!-- camera-column keeps video and record button in the same flex column -->
@@ -48,6 +36,19 @@
             REC <span id="rec-timer">0:00</span>
           </div>
         </div>
+
+        <div id="playback-controls" style="display:none">
+          <button id="play-pause">▶</button>
+          <button id="frame-back">← Frame</button>
+          <button id="frame-forward">Frame →</button>
+          <a id="download-recording" style="display:none">⬇ Save Video</a>
+          <select id="speed-select">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+          </select>
+        </div>
+
         <!-- Round record/stop button sits BELOW the video so it cannot affect canvas sizing -->
         <button id="record-btn" aria-label="Start recording" disabled></button>
       </div>

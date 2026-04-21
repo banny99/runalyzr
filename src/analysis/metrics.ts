@@ -115,6 +115,8 @@ export function calculateHipAdduction(
   return angles.reduce((a, b) => a + b, 0) / angles.length;
 }
 
+// Uses image landmarks intentionally: worldLandmarks origin is the hip midpoint per frame,
+// so world y of the hips is always ~0 and gives no oscillation signal.
 export function calculateVerticalOscillation(frames: FrameData[]): number | null {
   if (frames.length < 2) return null;
   const L = LANDMARKS;
@@ -142,6 +144,8 @@ export function calculateOverstriding(
   const footstrikes = events.filter((e) => e.type === 'footstrike' && e.foot === side);
   if (footstrikes.length === 0) return null;
 
+  // x-axis in world coords = left-right in camera frame. For sagittal view the runner
+  // moves left-right, so x correctly captures forward/backward ankle position relative to hip.
   const distances = footstrikes
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)

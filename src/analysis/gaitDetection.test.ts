@@ -8,7 +8,7 @@ function makeFrames(ankleYValues: number[], leftAnkle = true): FrameData[] {
     const lms = Array(33).fill(null).map((_, li): Landmark => ({
       x: 0.5, y: li === ankleIdx ? y : 0.5, z: 0, visibility: 1,
     }));
-    return { timestamp: i * (1000 / 30), landmarks: lms, worldLandmarks: lms };
+    return { timestamp: i * (1000 / 30), landmarks: [...lms], worldLandmarks: [...lms] };
   });
 }
 
