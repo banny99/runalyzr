@@ -307,6 +307,8 @@ async function main() {
   let recordedBlobUrl: string | null = null;
   let compositeCanvas: HTMLCanvasElement | null = null;
   let compositeCtx: CanvasRenderingContext2D | null = null;
+  let recordingHasOverlay = false;
+  let recordingMimeType = '';
 
   function showSetupPanel(): void {
     liveMetricsEl.style.display   = 'none';
@@ -504,25 +506,50 @@ async function main() {
         `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     }, 1000);
 
-    // Composite canvas: video pixels + overlay skeleton baked into the recording
-    if (typeof MediaRecorder !== 'undefined') {
-      compositeCanvas = document.createElement('canvas');
-      compositeCanvas.width  = video.videoWidth  || 1280;
-      compositeCanvas.height = video.videoHeight || 720;
-      compositeCtx = compositeCanvas.getContext('2d');
+    recordingHasOverlay = false;
+    recordingMimeType = '';
 
+    if (typeof MediaRecorder !== 'undefined') {
       const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
         .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+      recordingMimeType = mimeType;
+
+      // Detect captureStream support before allocating the composite canvas
+      const canCaptureStream = typeof document.createElement('canvas').captureStream === 'function';
+
+      let stream: MediaStream | null = null;
+      if (canCaptureStream) {
+        compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width  = video.videoWidth  || 1280;
+        compositeCanvas.height = video.videoHeight || 720;
+        compositeCtx = compositeCanvas.getContext('2d');
+        stream = compositeCanvas.captureStream(30);
+      } else {
+        stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+      }
+
       try {
-        const compositeStream = compositeCanvas.captureStream(30);
-        mediaRecorder = new MediaRecorder(compositeStream, mimeType ? { mimeType } : {});
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.start(100);
+        if (stream) {
+          mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+          mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+          mediaRecorder.start(100);
+          recordingHasOverlay = canCaptureStream;
+        }
       } catch {
         mediaRecorder = null;
         compositeCanvas = null;
         compositeCtx = null;
       }
+    }
+
+    // Show a hint in the REC indicator when the overlay won't be baked in
+    recIndicator.querySelector('.no-overlay-hint')?.remove();
+    if (!recordingHasOverlay) {
+      const hint = document.createElement('span');
+      hint.className = 'no-overlay-hint';
+      hint.textContent = '· no overlay';
+      hint.style.cssText = 'font-size:0.65rem;opacity:0.7;margin-left:0.25rem;';
+      recIndicator.appendChild(hint);
     }
   }
 
@@ -555,7 +582,9 @@ async function main() {
         (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
         const dl = document.getElementById('download-recording') as HTMLAnchorElement;
         dl.href = blobUrl;
-        dl.download = `run-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.webm`;
+        const ext = recordingMimeType.includes('mp4') ? 'mp4' : 'webm';
+        dl.download = `run-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
+        dl.textContent = recordingHasOverlay ? '⬇ Save Video' : '⬇ Save Video (no overlay)';
         dl.style.display = 'inline-block';
       }
     };
