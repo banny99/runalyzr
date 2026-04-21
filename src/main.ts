@@ -305,6 +305,8 @@ async function main() {
   let mediaRecorder: MediaRecorder | null = null;
   const recordedChunks: Blob[] = [];
   let recordedBlobUrl: string | null = null;
+  let compositeCanvas: HTMLCanvasElement | null = null;
+  let compositeCtx: CanvasRenderingContext2D | null = null;
 
   function showSetupPanel(): void {
     liveMetricsEl.style.display   = 'none';
@@ -446,6 +448,11 @@ async function main() {
                 timestamp: performance.now(),
               });
             }
+            // Bake video + skeleton overlay into the composite canvas for recording
+            if (compositeCtx && compositeCanvas) {
+              compositeCtx.drawImage(video, 0, 0, compositeCanvas.width, compositeCanvas.height);
+              compositeCtx.drawImage(canvas, 0, 0, compositeCanvas.width, compositeCanvas.height);
+            }
             updateLiveMetrics(null, detectCameraView(lms), 30);
           }
         } else if (cameraState === 'setup' && performance.now() - lastLandmarkTime > 500) {
@@ -497,17 +504,24 @@ async function main() {
         `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     }, 1000);
 
-    // Start capturing the camera stream
-    const stream = video.srcObject as MediaStream | null;
-    if (stream && typeof MediaRecorder !== 'undefined') {
+    // Composite canvas: video pixels + overlay skeleton baked into the recording
+    if (typeof MediaRecorder !== 'undefined') {
+      compositeCanvas = document.createElement('canvas');
+      compositeCanvas.width  = video.videoWidth  || 1280;
+      compositeCanvas.height = video.videoHeight || 720;
+      compositeCtx = compositeCanvas.getContext('2d');
+
       const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
         .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
       try {
-        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        const compositeStream = compositeCanvas.captureStream(30);
+        mediaRecorder = new MediaRecorder(compositeStream, mimeType ? { mimeType } : {});
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.start(100);
       } catch {
         mediaRecorder = null;
+        compositeCanvas = null;
+        compositeCtx = null;
       }
     }
   }
@@ -530,6 +544,8 @@ async function main() {
     runAnalysis(capturedFrames, viewForAnalysis);
 
     const finalize = (blobUrl: string | null): void => {
+      compositeCanvas = null;
+      compositeCtx = null;
       stopCamera(video);
       if (blobUrl) {
         if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
