@@ -14,7 +14,7 @@ function lm(x: number, y: number): Landmark {
 function makeFrame(overrides: Partial<Record<number, Landmark>>): FrameData {
   const base = Array(33).fill(null).map(() => lm(0.5, 0.5));
   Object.entries(overrides).forEach(([i, l]) => { base[Number(i)] = l!; });
-  return { timestamp: 0, landmarks: base, worldLandmarks: base };
+  return { timestamp: 0, landmarks: [...base], worldLandmarks: [...base] };
 }
 
 describe('calculateKneeFlexionAtContact', () => {

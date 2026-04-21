@@ -43,7 +43,7 @@ src/
 ## Data Flow
 
 1. **Frame capture** — `createProcessingLoop()` calls `landmarker.detectForVideo()` at up to 30 fps using `requestVideoFrameCallback` (falls back to `rAF`).
-2. **Storage** — each frame saved as `{ timestamp, landmarks }` in a capped array.
+2. **Storage** — each frame saved as `{ timestamp, landmarks, worldLandmarks }` in a capped array.
 3. **Gait detection** — after recording stops, ankle Y-trajectory peaks/troughs → footstrikes and toe-offs → gait cycles.
 4. **Metrics** — `calculateAllMetrics()` receives all frames, events, cycles, fps, and camera view; returns `AnalysisResults`.
 5. **Thresholds** — each numeric value is wrapped with a green/amber/red status via `makeMetricResult()`.
@@ -92,18 +92,6 @@ Detected automatically from hip landmark spread:
 
 ## Known Limitations / Future Improvements
 
-### High priority
-
-**Switch to `worldLandmarks`**
-MediaPipe returns a second landmark array (`result.worldLandmarks`) alongside the image-space `landmarks`. World landmarks are true 3D coordinates in metres, origin at hips, rotation-normalised. Currently unused. Using them would:
-- Make all angle calculations true 3D (knee flexion, ankle dorsiflexion, hip adduction)
-- Give pelvic drop and overstriding in real centimetres instead of scaled pixel approximations
-- Remove dependence on camera distance and positioning for accuracy
-- Files to change: `types.ts`, `processing.ts`, `angles.ts`, `metrics.ts`
-
-### Lower priority
-
-- **Stride length estimation** — world landmarks would also unlock anterior-posterior displacement as a real stride length approximation
-- **Frontal-plane knee valgus** — currently no valgus/varus metric; hip→knee→ankle in frontal view would detect this
-- **Per-cycle trend charts** — metrics currently averaged over all cycles; showing per-cycle trends would reveal fatigue patterns
-- **Slow-motion playback** — video playback rate control for manual review
+- **Stride length estimation** — world landmark z-axis (depth) could approximate anterior-posterior stride length in metres
+- **Frontal-plane knee valgus** — no valgus/varus metric yet; hip→knee→ankle angle in frontal view would detect this
+- **Per-cycle trend charts** — metrics are averaged over all cycles; per-cycle trends would reveal fatigue patterns

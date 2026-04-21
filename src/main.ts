@@ -427,7 +427,7 @@ async function main() {
 
       if (video.readyState >= 2) {
         const result = landmarker.detectForVideo(video, performance.now());
-        if (result.landmarks.length > 0) {
+        if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
           const lms = result.landmarks[0] as LandmarkArray;
           lastLandmarkTime = performance.now();
 
