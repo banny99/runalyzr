@@ -591,3 +591,90 @@ textarea { resize: vertical; }
     padding-bottom: 1.25rem;
   }
 }
+
+/* ── Analysis / quality warning banners ─────────────────── */
+#analysis-warning {
+  background: var(--surface-elevated);
+  border: 1px solid var(--status-amber);
+  border-left: 4px solid var(--status-amber);
+  border-radius: 6px;
+  color: var(--status-amber);
+  font-size: var(--font-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+#quality-warning {
+  background: var(--surface-elevated);
+  border: 1px solid var(--status-amber);
+  border-left: 4px solid var(--status-amber);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+#quality-warning-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--status-amber);
+  font-size: var(--font-sm);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+#quality-warning-list {
+  list-style: disc;
+  margin: 0;
+  padding: 0 1rem 0.75rem 2rem;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+#quality-warning-list li { padding: 0.15rem 0; }
+
+/* ── View selector ───────────────────────────────────────── */
+#view-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+.view-selector-label {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.view-selector-btn {
+  padding: 0.25rem 0.65rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+.view-selector-reset {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: var(--font-xs);
+  padding: 0.25rem 0;
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Share video button ──────────────────────────────────── */
+#share-video-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #fff;
+  border-radius: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

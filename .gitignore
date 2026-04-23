@@ -4,3 +4,4 @@ dist/
 .claude/
 src/**/*.js
 src/**/*.test.js
+docs/superpowers/

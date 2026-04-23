@@ -52,6 +52,14 @@
 
         <!-- Top-right: close camera + toggle skeleton overlay -->
         <div id="video-top-right">
+          <button id="share-video-btn" aria-label="Share video" style="display:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="16 6 12 2 8 6"/>
+              <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+          </button>
           <button id="camera-close-btn" aria-label="Close camera">✕</button>
           <button id="toggle-overlay-btn" aria-label="Toggle skeleton overlay">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -114,6 +122,7 @@
       </div>
 
       <div id="results-content" hidden>
+        <div id="view-selector"></div>
         <section id="metrics-section">
           <h2 class="section-heading">Metrics</h2>
           <div id="summary-cards"></div>

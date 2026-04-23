@@ -2,177 +2,15 @@ import { initVideoPlayer, startCamera, stopCamera } from './ui/videoPlayer';
 import { initLandmarker } from './pose/landmarker';
 import { createProcessingLoop, detectCameraView } from './pose/processing';
 import { initOverlay } from './ui/overlay';
-import { renderDashboard, updateLiveMetrics } from './ui/dashboard';
+import { renderDashboard, updateLiveMetrics, showAnalysisWarning, clearAnalysisWarning, showQualityWarning, clearQualityWarning, renderViewSelector } from './ui/dashboard';
+import { evaluateSetupChecks, evaluateVideoQuality } from './analysis/setupChecks';
+import type { SetupChecks } from './analysis/setupChecks';
 import { angleBetweenThreePoints } from './analysis/angles';
 import { detectGaitEvents, segmentGaitCycles } from './analysis/gaitDetection';
 import { calculateAllMetrics } from './analysis/metrics';
 import { generateFindings } from './analysis/findings';
 import { LANDMARKS } from './config/defaults';
 import type { LandmarkArray, AnalysisResults, MetricStatus, FrameData, CameraView } from './analysis/types';
-
-// ── Setup-check helpers (pure, module-level) ────────────────────────────────
-
-interface SetupChecks {
-  viewSelected: boolean;
-  stable: boolean;
-  orientation: boolean;     // turned the right way for the chosen view
-  jointAlignment: boolean;  // sagittal: hip/knee/ankle stack in X; frontal: bilateral symmetry
-  bodyInFrame: boolean;
-  goodDistance: boolean;
-  cameraPosition: boolean;  // sagittal: hip-height; frontal: centered + level
-  goodLighting: boolean;
-  detectedView: CameraView;
-  allPassed: boolean;
-  hint: string;
-}
-
-function evaluateSetupChecks(
-  landmarks: LandmarkArray,
-  consecutiveFrames: number,
-  selectedView: 'sagittal' | 'frontal' | null,
-): SetupChecks {
-  const L = LANDMARKS;
-  const key = [
-    L.LEFT_SHOULDER, L.RIGHT_SHOULDER,
-    L.LEFT_HIP, L.RIGHT_HIP,
-    L.LEFT_KNEE, L.RIGHT_KNEE,
-    L.LEFT_ANKLE, L.RIGHT_ANKLE,
-  ];
-
-  // ── Stable ────────────────────────────────────────────────────────────────
-  const stable = consecutiveFrames >= 15;
-
-  // ── Shared geometry ───────────────────────────────────────────────────────
-  const lShoulder = landmarks[L.LEFT_SHOULDER];
-  const rShoulder = landmarks[L.RIGHT_SHOULDER];
-  const lHip      = landmarks[L.LEFT_HIP];
-  const rHip      = landmarks[L.RIGHT_HIP];
-  const lKnee     = landmarks[L.LEFT_KNEE];
-  const rKnee     = landmarks[L.RIGHT_KNEE];
-  const lAnkle    = landmarks[L.LEFT_ANKLE];
-  const rAnkle    = landmarks[L.RIGHT_ANKLE];
-
-  const shoulderSpread = Math.abs(lShoulder.x - rShoulder.x);
-  const hipSpread      = Math.abs(lHip.x      - rHip.x);
-  const avgSpread      = (shoulderSpread + hipSpread) / 2;
-
-  const shoulderMidX = (lShoulder.x + rShoulder.x) / 2;
-  const hipMidX      = (lHip.x      + rHip.x)      / 2;
-  const hipMidY      = (lHip.y      + rHip.y)      / 2;
-
-  const shoulderY  = Math.min(lShoulder.y, rShoulder.y);
-  const ankleY     = Math.max(lAnkle.y,    rAnkle.y);
-  const heightSpan = ankleY - shoulderY;
-
-  // ── Orientation (are they facing the right way?) ──────────────────────────
-  // Sagittal: joints stack in X → low spread; Frontal: joints spread in X
-  const orientation =
-    selectedView === null       ? true :
-    selectedView === 'sagittal' ? avgSpread < 0.14 :
-    /* frontal */                 avgSpread > 0.10;
-
-  // ── Joint alignment (view-specific quality signal) ────────────────────────
-  let jointAlignment = true;
-  if (selectedView === 'sagittal' && orientation) {
-    // Hip, knee, ankle should be roughly at the same X (person truly perpendicular).
-    // Use whichever side is more visible (lower x = left side closer to camera, etc.)
-    const leftAlign  = Math.max(
-      Math.abs(lHip.x - lKnee.x), Math.abs(lKnee.x - lAnkle.x));
-    const rightAlign = Math.max(
-      Math.abs(rHip.x - rKnee.x), Math.abs(rKnee.x - rAnkle.x));
-    const bestAlign = Math.min(leftAlign, rightAlign);
-    jointAlignment = bestAlign < 0.18; // joints within 18% horizontal scatter
-  } else if (selectedView === 'frontal' && orientation) {
-    // Left and right counterparts should mirror around the body midline.
-    // midline X ≈ average of all mid-points
-    const midX = (shoulderMidX + hipMidX) / 2;
-    const lSymmetry = Math.abs((lShoulder.x - midX) + (rShoulder.x - midX));
-    const hSymmetry = Math.abs((lHip.x      - midX) + (rHip.x      - midX));
-    jointAlignment = Math.max(lSymmetry, hSymmetry) < 0.12; // fairly symmetric
-  }
-
-  // ── Body in frame ─────────────────────────────────────────────────────────
-  const bodyInFrame = key.every((i) => {
-    const lm = landmarks[i];
-    return lm && lm.x > 0.03 && lm.x < 0.97 && lm.y > 0.02 && lm.y < 0.98;
-  });
-
-  // ── Distance ──────────────────────────────────────────────────────────────
-  // Sagittal: height span fills 40–88% of frame
-  // Frontal:  shoulder width fills 20–60% of frame width
-  const goodDistance =
-    selectedView === 'frontal'
-      ? shoulderSpread > 0.20 && shoulderSpread < 0.60
-      : heightSpan > 0.40 && heightSpan < 0.88;
-
-  // ── Camera position ───────────────────────────────────────────────────────
-  // Sagittal: camera should be at roughly hip height → hip mid-Y near vertical centre
-  // Frontal:  person centred horizontally + camera level (shoulders horizontal)
-  let cameraPosition = true;
-  if (selectedView === 'sagittal') {
-    cameraPosition = hipMidY > 0.38 && hipMidY < 0.68;
-  } else if (selectedView === 'frontal') {
-    const centred = Math.abs(hipMidX - 0.5) < 0.15;
-    const tilt    = Math.abs(lShoulder.y - rShoulder.y) < 0.06; // shoulders level
-    cameraPosition = centred && tilt;
-  }
-
-  // ── Lighting ──────────────────────────────────────────────────────────────
-  const visAvg = key.reduce((s, i) => s + (landmarks[i]?.visibility ?? 1), 0) / key.length;
-  const goodLighting = visAvg > 0.50;
-
-  // ── Detected view ─────────────────────────────────────────────────────────
-  const detectedView = detectCameraView(landmarks);
-  const viewSelected = selectedView !== null;
-
-  // ── Hint (first unmet condition wins) ────────────────────────────────────
-  let hint = '';
-  if (!viewSelected) {
-    hint = 'Tap the view button above to choose Side or Front view.';
-  } else if (!stable) {
-    hint = 'Hold still — detecting your pose…';
-  } else if (!orientation) {
-    hint = selectedView === 'sagittal'
-      ? 'Turn sideways — camera should see your full profile (hip, knee, ankle in a line).'
-      : 'Face the camera directly — shoulders should be level and spread.';
-  } else if (!jointAlignment) {
-    hint = selectedView === 'sagittal'
-      ? 'Rotate a bit more — hip, knee and ankle should line up vertically.'
-      : 'Centre yourself — left and right sides should mirror each other.';
-  } else if (!bodyInFrame) {
-    hint = selectedView === 'sagittal'
-      ? 'Step back until your full body (head to feet) is visible from the side.'
-      : 'Step back until your full body (head to feet) is visible facing forward.';
-  } else if (selectedView === 'frontal' ? shoulderSpread < 0.20 : heightSpan < 0.40) {
-    hint = 'Move closer to the camera.';
-  } else if (selectedView === 'frontal' ? shoulderSpread > 0.60 : heightSpan > 0.88) {
-    hint = 'Step further back — you are too close.';
-  } else if (!cameraPosition) {
-    hint = selectedView === 'sagittal'
-      ? `Camera too ${hipMidY < 0.38 ? 'low' : 'high'} — raise or lower it to hip height.`
-      : Math.abs(hipMidX - 0.5) >= 0.15
-        ? `Move ${hipMidX < 0.5 ? 'right' : 'left'} — centre yourself in the frame.`
-        : 'Camera is tilted — level it so shoulders appear horizontal.';
-  } else if (!goodLighting) {
-    hint = 'Improve lighting: face a bright light source or move outdoors.';
-  } else {
-    hint = selectedView === 'sagittal'
-      ? 'All set — camera at hip height, 3–5 m away. Start recording when ready.'
-      : 'All set — camera at chest height, 3–5 m away. Start recording when ready.';
-  }
-
-  const allPassed =
-    viewSelected && stable && orientation && jointAlignment &&
-    bodyInFrame && goodDistance && cameraPosition && goodLighting;
-
-  return {
-    viewSelected, stable, orientation, jointAlignment,
-    bodyInFrame, goodDistance, cameraPosition, goodLighting,
-    detectedView, allPassed, hint,
-  };
-}
-
-/** Draw a dashed framing guide on the canvas (called after drawSkeleton). */
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -208,6 +46,7 @@ async function main() {
   const modalScrimEl       = document.getElementById('modal-scrim')        as HTMLElement;
   const modalCloseBtn      = document.getElementById('modal-close')        as HTMLButtonElement;
   const generatePdfBtn     = document.getElementById('generate-pdf-btn')   as HTMLButtonElement;
+  const shareVideoBtn      = document.getElementById('share-video-btn')    as HTMLButtonElement;
   function switchTab(tabName: string): void {
     document.querySelectorAll('.tab').forEach(t =>
       (t as HTMLElement).classList.toggle('active', (t as HTMLElement).dataset.tab === tabName));
@@ -234,6 +73,8 @@ async function main() {
   const overlay = initOverlay(canvas, video);
   let lastResults: AnalysisResults | null = null;
   let lastAnalysisFrameUrl: string | null = null;
+  let lastFrames: FrameData[] = [];
+  let manualView: 'sagittal' | 'frontal' | null = null;
 
   function buildJointStatuses(results: AnalysisResults): Partial<Record<number, MetricStatus>> {
     const s: Partial<Record<number, MetricStatus>> = {};
@@ -253,10 +94,17 @@ async function main() {
 
   // Shared analysis runner (video file and camera)
   function runAnalysis(frames: FrameData[], viewOverride: 'sagittal' | 'frontal' | null = null): void {
-    if (frames.length < 30) return;
+    clearAnalysisWarning();
+    clearQualityWarning();
+    if (frames.length < 30) {
+      showAnalysisWarning('Not enough footage to analyse — record at least 5 seconds of running.');
+      return;
+    }
+    lastFrames = frames;
     const durationSec = (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000;
     const fps  = frames.length / durationSec;
-    const view: CameraView = viewOverride ?? detectCameraView(frames[frames.length - 1].landmarks);
+    const detectedView: CameraView = detectCameraView(frames[frames.length - 1].landmarks);
+    const view: CameraView = viewOverride ?? detectedView;
     const gaitEvents = detectGaitEvents(frames, fps);
     const gaitCycles = segmentGaitCycles(gaitEvents);
     const results    = calculateAllMetrics(frames, gaitEvents, gaitCycles, fps, view);
@@ -264,6 +112,14 @@ async function main() {
     lastResults          = results;
     lastAnalysisFrameUrl = overlay.captureDataUrl();
     renderDashboard(results, findings, view);
+    renderViewSelector(
+      detectedView,
+      manualView,
+      (v) => { manualView = v; runAnalysis(lastFrames, manualView); },
+      ()  => { manualView = null; runAnalysis(lastFrames, null); },
+    );
+    const qualityWarnings = evaluateVideoQuality(frames, view === 'unknown' ? null : view);
+    if (qualityWarnings.length > 0) showQualityWarning(qualityWarnings);
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
   }
 
@@ -281,10 +137,13 @@ async function main() {
   });
 
   initVideoPlayer(video, fileInput, {
-    onLoadedMetadata: () => { overlay.syncSize(); },
-    onPlay:           () => loop.start(),
-    onPause:          () => { loop.stop(); runAnalysis(loop.getFrames()); },
-    onSeeked:         () => {
+    onLoadedMetadata: () => {
+      manualView = null;
+      overlay.syncSizeIfReady();
+    },
+    onPlay:   () => loop.start(),
+    onPause:  () => { loop.stop(); runAnalysis(loop.getFrames()); },
+    onSeeked: () => {
       const lm = loop.getCurrentLandmarks();
       if (lm) overlay.drawSkeleton(lm, lastResults ? buildJointStatuses(lastResults) : {});
     },
@@ -337,6 +196,7 @@ async function main() {
     videoTopRightEl.style.display = 'flex';
     recordBtn.style.display = 'block';
     playbackCtrlsEl.style.display = 'none';
+    shareVideoBtn.style.display = 'none';
   }
   function showIdleUI(): void {
     cameraIdleEl.style.display = 'flex';
@@ -346,6 +206,7 @@ async function main() {
     recordBtn.style.display = 'none';
     setupOverlayEl.classList.remove('visible');
     liveMetricsEl.style.display = 'none';
+    shareVideoBtn.style.display = 'none';
   }
   function showVideoFileUI(): void {
     cameraIdleEl.style.display = 'none';
@@ -437,6 +298,7 @@ async function main() {
   async function openCamera(): Promise<void> {
     cameraState = 'setup';
     loop.stop();
+    manualView = null;
     showCameraUI();
 
     // Clear any previously recorded video
@@ -445,6 +307,7 @@ async function main() {
       recordedBlobUrl = null;
       video.removeAttribute('src');
     }
+    shareVideoBtn.style.display = 'none';
 
     await startCamera(video);
 
@@ -523,6 +386,7 @@ async function main() {
     cameraState = 'closed';
     cameraRunning = false;
     cancelAnimationFrame(cameraRafId);
+    recordBtn.disabled = false;
     clearInterval(recTimerInterval);
     stopCamera(video);
 
@@ -544,17 +408,31 @@ async function main() {
     recordedChunks.length = 0;
     recordBtn.classList.remove('ready');
     recordBtn.classList.add('recording');
-    recordBtn.disabled = false;
+    recordBtn.disabled = true;
     recordBtn.setAttribute('aria-label', 'Stop recording');
     viewModeBtn.style.display = 'none';
     recIndicator.style.display = 'flex';
     showLivePanel();
 
     recStartTime = performance.now();
+
+    let lockSecondsLeft = 5;
+    recTimerEl.textContent = `Rec ${lockSecondsLeft}s more…`;
+
     recTimerInterval = window.setInterval(() => {
       const elapsed = Math.floor((performance.now() - recStartTime) / 1000);
-      recTimerEl.textContent =
-        `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+      if (lockSecondsLeft > 0) {
+        lockSecondsLeft--;
+        if (lockSecondsLeft > 0) {
+          recTimerEl.textContent = `Rec ${lockSecondsLeft}s more…`;
+        } else {
+          recordBtn.disabled = false;
+          recTimerEl.textContent = '0:05';
+        }
+      } else {
+        recTimerEl.textContent =
+          `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+      }
     }, 1000);
 
     recordingHasOverlay = false;
@@ -563,7 +441,6 @@ async function main() {
       const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
         .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
 
-      // Detect captureStream support before allocating the composite canvas
       const canCaptureStream = typeof document.createElement('canvas').captureStream === 'function';
 
       let stream: MediaStream | null = null;
@@ -591,7 +468,6 @@ async function main() {
       }
     }
 
-    // Show a hint in the REC indicator when the overlay won't be baked in
     recIndicator.querySelector('.no-overlay-hint')?.remove();
     if (!recordingHasOverlay) {
       const hint = document.createElement('span');
@@ -603,6 +479,7 @@ async function main() {
   }
 
   function stopRecording(): void {
+    manualView = null;
     const viewForAnalysis = selectedView;
     const capturedFrames = [...cameraFrames];
 
@@ -612,6 +489,7 @@ async function main() {
     clearInterval(recTimerInterval);
     recIndicator.style.display = 'none';
     recordBtn.classList.remove('recording', 'ready');
+    recordBtn.disabled = false;
     viewModeBtn.style.display = 'none';
 
     runAnalysis(capturedFrames, viewForAnalysis);
@@ -626,6 +504,7 @@ async function main() {
         recordedBlobUrl = blobUrl;
         video.src = blobUrl;
         video.load();
+        shareVideoBtn.style.display = 'flex';
         showVideoFileUI();
       } else {
         showIdleUI();
@@ -679,6 +558,25 @@ async function main() {
   recordBtn.addEventListener('click', () => {
     if (cameraState === 'setup')     startRecording();
     else if (cameraState === 'recording') stopRecording();
+  });
+
+  shareVideoBtn.addEventListener('click', async () => {
+    if (!recordedBlobUrl) return;
+    try {
+      const blob = await fetch(recordedBlobUrl).then((r) => r.blob());
+      const ext = blob.type === 'video/mp4' ? 'mp4' : 'webm';
+      const file = new File([blob], `runalyzr-recording.${ext}`, { type: blob.type });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Runalyzr Recording' });
+      } else {
+        const a = document.createElement('a');
+        a.href = recordedBlobUrl;
+        a.download = `runalyzr-recording.${ext}`;
+        a.click();
+      }
+    } catch {
+      // Blob revoked, share cancelled, or download failed — do nothing
+    }
   });
 
   // ── Overlay toggle & PDF export ─────────────────────────────────────────

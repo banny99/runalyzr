@@ -12,6 +12,7 @@ export interface OverlayController {
   ) => void;
   clear: () => void;
   syncSize: () => void;
+  syncSizeIfReady: () => void;
   setVisible: (visible: boolean) => void;
   captureDataUrl: () => string;
 }
@@ -26,6 +27,14 @@ export function initOverlay(
   function syncSize() {
     canvas.width = video.videoWidth || video.clientWidth;
     canvas.height = video.videoHeight || video.clientHeight;
+  }
+
+  function syncSizeIfReady() {
+    if (video.videoWidth > 0) {
+      syncSize();
+    } else {
+      video.addEventListener('canplay', syncSize, { once: true });
+    }
   }
 
   function clear() {
@@ -94,6 +103,7 @@ export function initOverlay(
     drawAngleLabel,
     clear,
     syncSize,
+    syncSizeIfReady,
     setVisible(v) {
       visible = v;
       if (!v) clear();

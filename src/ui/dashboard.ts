@@ -75,3 +75,96 @@ export function updateLiveMetrics(
   if (cadenceEl) cadenceEl.textContent = cadence ? `Cadence: ${cadence} spm` : 'Cadence: —';
   if (viewEl) viewEl.textContent = `View: ${view} | ${fps.toFixed(0)} fps`;
 }
+
+export function showAnalysisWarning(message: string): void {
+  clearAnalysisWarning();
+  const banner = document.createElement('div');
+  banner.id = 'analysis-warning';
+  banner.textContent = message;
+  const resultsPanel = document.getElementById('results-panel');
+  if (resultsPanel) resultsPanel.insertAdjacentElement('afterbegin', banner);
+}
+
+export function clearAnalysisWarning(): void {
+  document.getElementById('analysis-warning')?.remove();
+}
+
+export function showQualityWarning(warnings: string[]): void {
+  clearQualityWarning();
+  if (warnings.length === 0) return;
+  const resultsPanel = document.getElementById('results-panel');
+  if (!resultsPanel) return;
+  const banner = document.createElement('div');
+  banner.id = 'quality-warning';
+
+  const toggle = document.createElement('button');
+  toggle.id = 'quality-warning-toggle';
+  toggle.textContent = '⚠ Video quality issues may affect accuracy ▾';
+  banner.appendChild(toggle);
+
+  const list = document.createElement('ul');
+  list.id = 'quality-warning-list';
+  list.hidden = true;
+  for (const w of warnings) {
+    const li = document.createElement('li');
+    li.textContent = w;
+    list.appendChild(li);
+  }
+  banner.appendChild(list);
+
+  toggle.addEventListener('click', () => {
+    list.hidden = !list.hidden;
+    toggle.textContent = list.hidden
+      ? '⚠ Video quality issues may affect accuracy ▾'
+      : '⚠ Video quality issues may affect accuracy ▴';
+  });
+
+  resultsPanel.insertAdjacentElement('afterbegin', banner);
+}
+
+export function clearQualityWarning(): void {
+  document.getElementById('quality-warning')?.remove();
+}
+
+export function renderViewSelector(
+  detectedView: CameraView,
+  manualView: CameraView | null,
+  onSwitch: (view: 'sagittal' | 'frontal') => void,
+  onReset: () => void,
+): void {
+  const container = document.getElementById('view-selector');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const viewLabel = (v: CameraView | null): string => {
+    if (v === 'sagittal') return 'Side view';
+    if (v === 'frontal')  return 'Front view';
+    return 'View unknown';
+  };
+
+  const activeView = manualView ?? detectedView;
+  const suffix = manualView ? ' (manual)' : ' (auto)';
+
+  const label = document.createElement('span');
+  label.className = 'view-selector-label';
+  label.textContent = viewLabel(activeView) + suffix;
+  container.appendChild(label);
+
+  if (manualView === null) {
+    const btn = document.createElement('button');
+    btn.className = 'view-selector-btn';
+    btn.textContent = 'Switch';
+    btn.addEventListener('click', () => {
+      const next: 'sagittal' | 'frontal' =
+        activeView === 'sagittal' ? 'frontal' : 'sagittal';
+      onSwitch(next);
+    });
+    container.appendChild(btn);
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'view-selector-reset';
+    btn.textContent = 'Reset to auto';
+    btn.addEventListener('click', onReset);
+    container.appendChild(btn);
+  }
+}
