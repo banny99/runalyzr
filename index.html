@@ -11,88 +11,161 @@
   <link rel="stylesheet" href="/src/ui/styles.css" />
 </head>
 <body>
+
   <header id="app-header">
     <h1>Runalyzr</h1>
-    <div id="upload-controls">
-      <label id="upload-label" for="file-input">Upload Video</label>
-      <input type="file" id="file-input" accept="video/mp4,video/quicktime" />
-      <button id="camera-open-btn">Camera</button>
+    <!-- Tablet-only header actions -->
+    <div id="header-actions">
+      <button id="upload-btn-tablet">Upload Video</button>
+      <button id="export-pdf-btn" disabled>Export PDF</button>
     </div>
   </header>
 
-  <main>
-    <section id="video-section">
-      <!-- camera-column keeps video and record button in the same flex column -->
-      <div id="camera-column">
-        <div id="video-container">
-          <video id="video" playsinline muted></video>
-          <canvas id="overlay"></canvas>
-          <!-- View mode selector — shown only during camera setup -->
-          <button id="view-mode-btn" aria-label="Select camera angle" title="Select camera angle">Side</button>
-          <button id="toggle-overlay" title="Toggle skeleton overlay">Overlay</button>
-          <!-- REC indicator — shown only while recording -->
-          <div id="rec-indicator">
-            <span class="rec-dot"></span>
-            REC <span id="rec-timer">0:00</span>
-          </div>
+  <!-- Single hidden file input — triggered programmatically -->
+  <input type="file" id="file-input" accept="video/mp4,video/quicktime" />
+
+  <div id="app-body">
+
+    <!-- ── Camera panel (full tab on phone / left 60% on tablet) ── -->
+    <div id="camera-panel" class="tab-panel active">
+
+      <!-- Idle: shown when neither camera nor video is active -->
+      <div id="camera-idle">
+        <p id="idle-tagline">Mount device on tripod, then begin.</p>
+        <button id="camera-open-btn">Open Camera</button>
+        <button id="upload-btn-phone">Upload Video</button>
+      </div>
+
+      <!-- Video area: shown when camera or video file is active -->
+      <div id="video-container">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+
+        <!-- Top-left: REC indicator -->
+        <div id="rec-indicator">
+          <span class="rec-dot"></span>
+          REC <span id="rec-timer">0:00</span>
         </div>
 
-        <div id="playback-controls" style="display:none">
-          <button id="play-pause">▶</button>
+        <!-- Top-left: view mode (camera setup only) -->
+        <button id="view-mode-btn" aria-label="Select camera angle">⚠ Choose view</button>
+
+        <!-- Top-right: close camera + toggle skeleton overlay -->
+        <div id="video-top-right">
+          <button id="camera-close-btn" aria-label="Close camera">✕</button>
+          <button id="toggle-overlay-btn" aria-label="Toggle skeleton overlay">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Bottom-centre: record button (camera mode only) -->
+        <button id="record-btn" aria-label="Start recording" disabled></button>
+
+        <!-- Bottom bar: playback controls (video review only) -->
+        <div id="playback-controls">
           <button id="frame-back">← Frame</button>
           <button id="frame-forward">Frame →</button>
-          <a id="download-recording" style="display:none">⬇ Save Video</a>
           <select id="speed-select">
             <option value="0.25">0.25×</option>
             <option value="0.5">0.5×</option>
             <option value="1" selected>1×</option>
           </select>
         </div>
-
-        <!-- Round record/stop button sits BELOW the video so it cannot affect canvas sizing -->
-        <button id="record-btn" aria-label="Start recording" disabled></button>
       </div>
 
-      <!-- Shown during video playback / camera recording -->
+      <!-- Setup overlay: toggle button + collapsible checklist (camera setup phase) -->
+      <div id="setup-overlay">
+        <button id="setup-toggle" aria-label="Toggle setup checklist">
+          <span id="setup-toggle-icon">⚠</span>
+          <span id="setup-toggle-label">Setup</span>
+        </button>
+        <div id="setup-panel">
+          <ul id="setup-checklist">
+            <li id="check-view"        class="check-fail">Choose view (tap top-left)</li>
+            <li id="check-stable"      class="check-pending">Detecting pose…</li>
+            <li id="check-orientation" class="check-pending">Correct orientation</li>
+            <li id="check-alignment"   class="check-pending">Joint alignment</li>
+            <li id="check-body"        class="check-pending">Full body in frame</li>
+            <li id="check-distance"    class="check-pending">Good distance</li>
+            <li id="check-camera-pos"  class="check-pending">Camera position</li>
+            <li id="check-lighting"    class="check-pending">Adequate lighting</li>
+          </ul>
+          <p id="setup-hint"></p>
+        </div>
+      </div>
+
+      <!-- Live metrics (recording phase) -->
       <div id="live-metrics">
         <p id="cadence-display">Cadence: —</p>
         <p id="view-display">View: —</p>
       </div>
 
-      <!-- Shown during camera setup phase (replaces live-metrics in that slot) -->
-      <div id="setup-guidance">
-        <h3>Positioning checklist</h3>
-        <ul id="setup-checklist">
-          <li id="check-view"        class="check-fail">Choose view (tap button above)</li>
-          <li id="check-stable"      class="check-pending">Detecting pose…</li>
-          <li id="check-orientation" class="check-pending">Correct orientation</li>
-          <li id="check-alignment"   class="check-pending">Joint alignment</li>
-          <li id="check-body"        class="check-pending">Full body in frame</li>
-          <li id="check-distance"    class="check-pending">Good distance</li>
-          <li id="check-camera-pos"  class="check-pending">Camera position</li>
-          <li id="check-lighting"    class="check-pending">Adequate lighting</li>
-        </ul>
-        <p id="setup-hint"></p>
-        <p class="setup-tip">
-          Tap the view button to choose <strong>Side</strong> (knee/hip metrics) or
-          <strong>Front</strong> (pelvic/trunk metrics). Then record at least 10 seconds of running.
-        </p>
+    </div><!-- /camera-panel -->
+
+    <!-- ── Results panel (full tab on phone / right 40% on tablet) ── -->
+    <div id="results-panel" class="tab-panel">
+
+      <div id="results-empty">
+        <p>Record a run to see results</p>
       </div>
-    </section>
 
-    <section id="summary-cards"></section>
+      <div id="results-content" hidden>
+        <section id="metrics-section">
+          <h2 class="section-heading">Metrics</h2>
+          <div id="summary-cards"></div>
+        </section>
+        <section id="findings-section">
+          <h2 class="section-heading">Findings</h2>
+          <div id="findings-list"></div>
+        </section>
+      </div>
 
-    <section id="findings">
-      <h2>Findings</h2>
-      <div id="findings-list"></div>
-    </section>
+      <!-- Phone-only sticky export bar -->
+      <div id="results-export-bar">
+        <button id="export-pdf-phone" disabled>Export PDF</button>
+      </div>
 
-    <section id="export-section">
-      <input type="text" id="client-name" placeholder="Client name (not stored)" />
-      <textarea id="physio-notes" placeholder="Session notes..."></textarea>
-      <button id="export-pdf" disabled>Export PDF</button>
-    </section>
-  </main>
+    </div><!-- /results-panel -->
+
+  </div><!-- /app-body -->
+
+  <!-- Bottom tab bar (phone only — hidden via CSS on tablet) -->
+  <nav id="tab-bar">
+    <button class="tab active" data-tab="camera">
+      <span class="tab-icon">📷</span>
+      <span class="tab-label">Camera</span>
+    </button>
+    <button class="tab" data-tab="results">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Results</span>
+    </button>
+  </nav>
+
+  <!-- Report modal (bottom drawer on phone / centered modal on tablet) -->
+  <div id="report-modal" hidden>
+    <div id="modal-scrim"></div>
+    <div id="modal-content">
+      <div id="modal-header">
+        <span>Export Report</span>
+        <button id="modal-close" aria-label="Close">✕</button>
+      </div>
+      <div id="modal-body">
+        <label>
+          Client name
+          <input type="text" id="client-name" placeholder="Not stored" />
+        </label>
+        <label>
+          Session notes
+          <textarea id="physio-notes" rows="4" placeholder="Optional notes…"></textarea>
+        </label>
+        <button id="generate-pdf-btn">Generate PDF</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

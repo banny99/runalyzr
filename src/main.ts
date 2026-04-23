@@ -173,27 +173,6 @@ function evaluateSetupChecks(
 }
 
 /** Draw a dashed framing guide on the canvas (called after drawSkeleton). */
-function drawSetupGuide(canvasEl: HTMLCanvasElement, ready: boolean): void {
-  const ctx = canvasEl.getContext('2d');
-  if (!ctx) return;
-  const { width: w, height: h } = canvasEl;
-
-  ctx.save();
-  ctx.strokeStyle = ready ? '#22c55e' : 'rgba(255,255,255,0.28)';
-  ctx.lineWidth   = Math.max(2, w * 0.003);
-  ctx.setLineDash([10, 5]);
-  ctx.strokeRect(w * 0.18, h * 0.03, w * 0.64, h * 0.94);
-  ctx.setLineDash([]);
-
-  if (!ready) {
-    ctx.fillStyle    = 'rgba(255,255,255,0.50)';
-    ctx.font         = `${Math.max(11, Math.round(w * 0.022))}px system-ui, sans-serif`;
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('Stand inside the guide — full body visible', w / 2, h - 6);
-  }
-  ctx.restore();
-}
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -203,18 +182,43 @@ async function main() {
   loadingEl.textContent = 'Loading pose model…';
   document.body.appendChild(loadingEl);
 
-  const video            = document.getElementById('video')          as HTMLVideoElement;
-  const canvas           = document.getElementById('overlay')        as HTMLCanvasElement;
-  const fileInput        = document.getElementById('file-input')     as HTMLInputElement;
-  const toggleOverlayBtn = document.getElementById('toggle-overlay') as HTMLButtonElement;
-  const exportPdfBtn     = document.getElementById('export-pdf')     as HTMLButtonElement;
-  const cameraOpenBtn    = document.getElementById('camera-open-btn')  as HTMLButtonElement;
-  const recordBtn        = document.getElementById('record-btn')       as HTMLButtonElement;
-  const viewModeBtn      = document.getElementById('view-mode-btn')    as HTMLButtonElement;
-  const recIndicator     = document.getElementById('rec-indicator')    as HTMLElement;
-  const recTimerEl       = document.getElementById('rec-timer')        as HTMLElement;
-  const liveMetricsEl    = document.getElementById('live-metrics')     as HTMLElement;
-  const setupGuidanceEl  = document.getElementById('setup-guidance')   as HTMLElement;
+  const video              = document.getElementById('video')              as HTMLVideoElement;
+  const canvas             = document.getElementById('overlay')            as HTMLCanvasElement;
+  const fileInput          = document.getElementById('file-input')         as HTMLInputElement;
+  const toggleOverlayBtn   = document.getElementById('toggle-overlay-btn') as HTMLButtonElement;
+  const exportPdfBtnTablet = document.getElementById('export-pdf-btn')     as HTMLButtonElement;
+  const exportPdfBtnPhone  = document.getElementById('export-pdf-phone')   as HTMLButtonElement;
+  const cameraOpenBtn      = document.getElementById('camera-open-btn')    as HTMLButtonElement;
+  const cameraCloseBtn     = document.getElementById('camera-close-btn')   as HTMLButtonElement;
+  const recordBtn          = document.getElementById('record-btn')         as HTMLButtonElement;
+  const viewModeBtn        = document.getElementById('view-mode-btn')      as HTMLButtonElement;
+  const recIndicator       = document.getElementById('rec-indicator')      as HTMLElement;
+  const recTimerEl         = document.getElementById('rec-timer')          as HTMLElement;
+  const liveMetricsEl      = document.getElementById('live-metrics')       as HTMLElement;
+  const setupOverlayEl     = document.getElementById('setup-overlay')      as HTMLElement;
+  const setupToggleEl      = document.getElementById('setup-toggle')       as HTMLButtonElement;
+  const setupPanelEl       = document.getElementById('setup-panel')        as HTMLElement;
+  const cameraIdleEl       = document.getElementById('camera-idle')        as HTMLElement;
+  const videoContainerEl   = document.getElementById('video-container')    as HTMLElement;
+  const videoTopRightEl    = document.getElementById('video-top-right')    as HTMLElement;
+  const playbackCtrlsEl    = document.getElementById('playback-controls')  as HTMLElement;
+  const uploadBtnPhone     = document.getElementById('upload-btn-phone')   as HTMLButtonElement;
+  const uploadBtnTablet    = document.getElementById('upload-btn-tablet')  as HTMLButtonElement;
+  const reportModalEl      = document.getElementById('report-modal')       as HTMLElement;
+  const modalScrimEl       = document.getElementById('modal-scrim')        as HTMLElement;
+  const modalCloseBtn      = document.getElementById('modal-close')        as HTMLButtonElement;
+  const generatePdfBtn     = document.getElementById('generate-pdf-btn')   as HTMLButtonElement;
+  function switchTab(tabName: string): void {
+    document.querySelectorAll('.tab').forEach(t =>
+      (t as HTMLElement).classList.toggle('active', (t as HTMLElement).dataset.tab === tabName));
+    document.querySelectorAll('.tab-panel').forEach(p =>
+      (p as HTMLElement).classList.toggle('active', p.id === `${tabName}-panel`));
+  }
+  document.querySelectorAll('.tab').forEach(tab =>
+    tab.addEventListener('click', () => switchTab((tab as HTMLElement).dataset.tab!)));
+
+  uploadBtnPhone?.addEventListener('click', () => fileInput.click());
+  uploadBtnTablet?.addEventListener('click', () => fileInput.click());
 
   let landmarker: Awaited<ReturnType<typeof initLandmarker>>;
   try {
@@ -277,7 +281,7 @@ async function main() {
   });
 
   initVideoPlayer(video, fileInput, {
-    onLoadedMetadata: () => { overlay.syncSize(); cameraColumnEl.style.display = 'flex'; },
+    onLoadedMetadata: () => { overlay.syncSize(); },
     onPlay:           () => loop.start(),
     onPause:          () => { loop.stop(); runAnalysis(loop.getFrames()); },
     onSeeked:         () => {
@@ -289,8 +293,6 @@ async function main() {
   video.addEventListener('ended', () => { loop.stop(); runAnalysis(loop.getFrames()); });
 
   // ── Camera mode state machine ───────────────────────────────────────────
-
-  const cameraColumnEl = document.getElementById('camera-column') as HTMLElement;
 
   type CameraState = 'closed' | 'setup' | 'recording';
   let cameraState: CameraState = 'closed';
@@ -308,16 +310,61 @@ async function main() {
   let compositeCanvas: HTMLCanvasElement | null = null;
   let compositeCtx: CanvasRenderingContext2D | null = null;
   let recordingHasOverlay = false;
-  let recordingMimeType = '';
 
+  function setPillColor(color: 'grey' | 'red' | 'green'): void {
+    setupToggleEl.classList.remove('pill-red', 'pill-green');
+    if (color !== 'grey') setupToggleEl.classList.add(`pill-${color}`);
+    document.getElementById('setup-toggle-icon')!.textContent =
+      color === 'green' ? '✓' : color === 'red' ? '✗' : '⚠';
+  }
   function showSetupPanel(): void {
-    liveMetricsEl.style.display   = 'none';
-    setupGuidanceEl.style.display = 'block';
+    liveMetricsEl.style.display = 'none';
+    setupOverlayEl.classList.add('visible');
+    setupPanelEl.classList.add('open');
+    videoContainerEl.classList.remove('frame-red', 'frame-amber', 'frame-green');
+    videoContainerEl.classList.add('frame-grey');
+    setPillColor('grey');
   }
   function showLivePanel(): void {
-    liveMetricsEl.style.display   = 'block';
-    setupGuidanceEl.style.display = 'none';
+    liveMetricsEl.style.display = 'flex';
   }
+  setupToggleEl.addEventListener('click', () => {
+    setupPanelEl.classList.toggle('open');
+  });
+  function showCameraUI(): void {
+    cameraIdleEl.style.display = 'none';
+    videoContainerEl.style.display = 'block';
+    videoTopRightEl.style.display = 'flex';
+    recordBtn.style.display = 'block';
+    playbackCtrlsEl.style.display = 'none';
+  }
+  function showIdleUI(): void {
+    cameraIdleEl.style.display = 'flex';
+    videoContainerEl.style.display = 'none';
+    videoContainerEl.classList.remove('frame-grey', 'frame-red', 'frame-amber', 'frame-green');
+    videoTopRightEl.style.display = 'none';
+    recordBtn.style.display = 'none';
+    setupOverlayEl.classList.remove('visible');
+    liveMetricsEl.style.display = 'none';
+  }
+  function showVideoFileUI(): void {
+    cameraIdleEl.style.display = 'none';
+    videoContainerEl.style.display = 'block';
+    videoTopRightEl.style.display = 'flex';
+    recordBtn.style.display = 'none';
+    playbackCtrlsEl.style.display = 'flex';
+  }
+
+  function openReportModal() {
+    reportModalEl.hidden = false;
+  }
+  function closeReportModal() {
+    reportModalEl.hidden = true;
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    if (cameraState === 'closed') showVideoFileUI();
+  });
 
   function applyCheck(id: string, pass: boolean, passText: string, failText: string,
                       pending = false): void {
@@ -389,11 +436,8 @@ async function main() {
 
   async function openCamera(): Promise<void> {
     cameraState = 'setup';
-    cameraOpenBtn.textContent = 'Close Camera';
     loop.stop();
-    (document.getElementById('playback-controls') as HTMLElement).style.display = 'none';
-    (document.getElementById('download-recording') as HTMLAnchorElement).style.display = 'none';
-    cameraColumnEl.style.display = 'flex';
+    showCameraUI();
 
     // Clear any previously recorded video
     if (recordedBlobUrl) {
@@ -408,7 +452,6 @@ async function main() {
     overlay.syncSize();
     video.addEventListener('resize', () => overlay.syncSize(), { once: true });
 
-    recordBtn.style.display = 'flex';
     recordBtn.disabled = true;
     recordBtn.classList.remove('ready', 'recording');
     recordBtn.setAttribute('aria-label', 'Start recording');
@@ -438,9 +481,14 @@ async function main() {
             setupConsecutiveFrames++;
             const checks = evaluateSetupChecks(lms, setupConsecutiveFrames, selectedView);
             refreshSetupUI(checks);
-            drawSetupGuide(canvas, checks.allPassed);
             recordBtn.disabled = !checks.allPassed;
             recordBtn.classList.toggle('ready', checks.allPassed);
+            const hasRed = !!document.querySelector('#setup-checklist .check-fail');
+            const color  = checks.allPassed ? 'green' : hasRed ? 'red' : 'grey';
+            videoContainerEl.classList.remove('frame-grey', 'frame-red', 'frame-amber', 'frame-green');
+            videoContainerEl.classList.add(`frame-${color}`);
+            setPillColor(color);
+            if (checks.allPassed) showLivePanel(); else setupOverlayEl.classList.add('visible');
           } else if (cameraState === 'recording') {
             // Cap at ~5 min @ 30fps to avoid memory issues on iPad
             if (cameraFrames.length < 9000) {
@@ -458,8 +506,11 @@ async function main() {
             updateLiveMetrics(null, detectCameraView(lms), 30);
           }
         } else if (cameraState === 'setup' && performance.now() - lastLandmarkTime > 500) {
-          // Person left frame — reset stability counter
           setupConsecutiveFrames = 0;
+          videoContainerEl.classList.remove('frame-red', 'frame-amber', 'frame-green');
+          videoContainerEl.classList.add('frame-grey');
+          setPillColor('grey');
+          setupOverlayEl.classList.add('visible');
         }
       }
 
@@ -475,14 +526,14 @@ async function main() {
     clearInterval(recTimerInterval);
     stopCamera(video);
 
-    cameraOpenBtn.textContent = 'Camera';
-    // Restore playback controls if a video file is loaded
-    if (video.src) (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
-    recordBtn.style.display = 'none';
     recordBtn.classList.remove('ready', 'recording');
     viewModeBtn.style.display = 'none';
     recIndicator.style.display = 'none';
-    showLivePanel();
+    if (video.src) {
+      showVideoFileUI();
+    } else {
+      showIdleUI();
+    }
 
     if (wasRecording) runAnalysis([...cameraFrames], selectedView);
   }
@@ -507,12 +558,10 @@ async function main() {
     }, 1000);
 
     recordingHasOverlay = false;
-    recordingMimeType = '';
 
     if (typeof MediaRecorder !== 'undefined') {
       const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
         .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
-      recordingMimeType = mimeType;
 
       // Detect captureStream support before allocating the composite canvas
       const canCaptureStream = typeof document.createElement('canvas').captureStream === 'function';
@@ -563,12 +612,10 @@ async function main() {
     clearInterval(recTimerInterval);
     recIndicator.style.display = 'none';
     recordBtn.classList.remove('recording', 'ready');
-    recordBtn.style.display = 'none';
     viewModeBtn.style.display = 'none';
-    cameraOpenBtn.textContent = 'Camera';
-    showLivePanel();
 
     runAnalysis(capturedFrames, viewForAnalysis);
+    if (window.innerWidth < 768) switchTab('results');
 
     const finalize = (blobUrl: string | null): void => {
       compositeCanvas = null;
@@ -579,13 +626,9 @@ async function main() {
         recordedBlobUrl = blobUrl;
         video.src = blobUrl;
         video.load();
-        (document.getElementById('playback-controls') as HTMLElement).style.display = 'flex';
-        const dl = document.getElementById('download-recording') as HTMLAnchorElement;
-        dl.href = blobUrl;
-        const ext = recordingMimeType.includes('mp4') ? 'mp4' : 'webm';
-        dl.download = `run-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
-        dl.textContent = recordingHasOverlay ? '⬇ Save Video' : '⬇ Save Video (no overlay)';
-        dl.style.display = 'inline-block';
+        showVideoFileUI();
+      } else {
+        showIdleUI();
       }
     };
 
@@ -603,10 +646,8 @@ async function main() {
     mediaRecorder = null;
   }
 
-  cameraOpenBtn.addEventListener('click', () => {
-    if (cameraState === 'closed') openCamera().catch(console.error);
-    else closeCamera();
-  });
+  cameraOpenBtn.addEventListener('click', () => openCamera().catch(console.error));
+  cameraCloseBtn?.addEventListener('click', () => closeCamera());
 
   function updateViewModeBtn(): void {
     if (selectedView === 'sagittal') {
@@ -642,25 +683,33 @@ async function main() {
 
   // ── Overlay toggle & PDF export ─────────────────────────────────────────
 
-  toggleOverlayBtn.addEventListener('click', () => {
-    const isVisible = canvas.style.display !== 'none';
-    overlay.setVisible(!isVisible);
-    canvas.style.display = isVisible ? 'none' : '';
-    toggleOverlayBtn.classList.toggle('overlay-off', isVisible);
+  let overlayVisible = true;
+  toggleOverlayBtn?.addEventListener('click', () => {
+    overlayVisible = !overlayVisible;
+    overlay.setVisible(overlayVisible);
+    toggleOverlayBtn.style.opacity = overlayVisible ? '1' : '0.45';
   });
 
-  exportPdfBtn.addEventListener('click', async () => {
+  function handleExportClick() {
+    if (!lastResults) return;
+    openReportModal();
+  }
+  exportPdfBtnTablet?.addEventListener('click', handleExportClick);
+  exportPdfBtnPhone?.addEventListener('click', handleExportClick);
+  modalCloseBtn?.addEventListener('click', closeReportModal);
+  modalScrimEl?.addEventListener('click', closeReportModal);
+
+  generatePdfBtn?.addEventListener('click', async () => {
     if (!lastResults) return;
     const { generateReport } = await import('./report/pdfGenerator');
-    const clientName = (document.getElementById('client-name') as HTMLInputElement).value;
-    const notes      = (document.getElementById('physio-notes') as HTMLTextAreaElement).value;
     generateReport({
-      clientName,
-      notes,
-      metrics:     lastResults,
-      findings:    generateFindings(lastResults),
+      clientName: (document.getElementById('client-name') as HTMLInputElement).value,
+      notes: (document.getElementById('physio-notes') as HTMLTextAreaElement).value,
+      metrics: lastResults,
+      findings: generateFindings(lastResults),
       frameDataUrl: lastAnalysisFrameUrl,
     });
+    closeReportModal();
   });
 }
 

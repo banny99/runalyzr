@@ -11,66 +11,58 @@ function validMetricsForView(view: CameraView): Set<string> | null {
 export function renderDashboard(
   results: AnalysisResults,
   findings: FindingItem[],
-  view: CameraView = 'unknown',
+  view: CameraView,
 ): void {
-  renderSummaryCards(results, view);
-  renderFindings(findings, view);
-  const exportBtn = document.getElementById('export-pdf');
-  if (exportBtn) exportBtn.removeAttribute('disabled');
+    renderSummaryCards(results, view);
+    renderFindings(findings);
+
+    const resultsEmpty   = document.getElementById('results-empty');
+    const resultsContent = document.getElementById('results-content');
+    if (resultsEmpty)   resultsEmpty.style.display = 'none';
+    if (resultsContent) resultsContent.hidden = false;
+
+    document.getElementById('export-pdf-btn')?.removeAttribute('disabled');
+    document.getElementById('export-pdf-phone')?.removeAttribute('disabled');
 }
 
-export function renderSummaryCards(results: AnalysisResults, view: CameraView = 'unknown'): void {
-  const container = document.getElementById('summary-cards');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const valid = validMetricsForView(view);
-
-  for (const [key, result] of Object.entries(results) as [keyof AnalysisResults, typeof results[keyof AnalysisResults]][]) {
-    if (!result) continue;
-    if (valid && !valid.has(key)) continue; // skip metrics not valid for this view
-
-    const threshold = THRESHOLDS[key];
-    const card = document.createElement('div');
-    card.className = `metric-card ${result.status}`;
-    card.dataset.metric = key;
-
-    const normalRange = threshold
-      ? `Normal: ${threshold.green[0]}–${threshold.green[1]}${threshold.unit}`
-      : '';
-
-    card.innerHTML = `
+export function renderSummaryCards(results: AnalysisResults, view: CameraView): void {
+    const container = document.getElementById('summary-cards');
+    if (!container) return;
+    container.innerHTML = '';
+    const allowedMetrics = validMetricsForView(view);
+    for (const [key, result] of Object.entries(results) as [keyof AnalysisResults, typeof results[keyof AnalysisResults]][]) {
+        if (!result) continue;
+        if (allowedMetrics && !allowedMetrics.has(key)) continue;
+        const threshold = THRESHOLDS[key];
+        const card = document.createElement('div');
+        card.className = `metric-card ${result.status}`;
+        card.dataset.metric = key;
+        const normalRange = threshold
+            ? `Normal: ${threshold.green[0]}–${threshold.green[1]}${threshold.unit}`
+            : '';
+        card.innerHTML = `
       <div class="metric-name">${METRIC_LABELS[key] ?? key}</div>
-      <div class="metric-value">
-        <span class="status-dot ${result.status}"></span>
-        ${result.value.toFixed(1)}${result.unit}
-      </div>
+      <div class="metric-value">${result.value.toFixed(1)}${result.unit}</div>
       <div class="metric-range">${normalRange}</div>
     `;
-
-    container.appendChild(card);
-  }
+        container.appendChild(card);
+    }
 }
 
-export function renderFindings(findings: FindingItem[], view: CameraView = 'unknown'): void {
-  const container = document.getElementById('findings-list');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const valid = validMetricsForView(view);
-  const filtered = valid ? findings.filter(f => valid.has(f.metric)) : findings;
-
-  if (filtered.length === 0) {
-    container.innerHTML = '<p style="color:#666;font-size:0.875rem;">No issues detected.</p>';
-    return;
-  }
-
-  for (const finding of filtered) {
-    const item = document.createElement('div');
-    item.className = `finding-item ${finding.status}`;
-    item.textContent = finding.text;
-    container.appendChild(item);
-  }
+export function renderFindings(findings: FindingItem[]): void {
+    const container = document.getElementById('findings-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (findings.length === 0) {
+        container.innerHTML = '<p class="findings-empty">No issues detected.</p>';
+        return;
+    }
+    for (const finding of findings) {
+        const item = document.createElement('div');
+        item.className = `finding-item ${finding.status}`;
+        item.innerHTML = `<span class="finding-dot"></span><span>${finding.text}</span>`;
+        container.appendChild(item);
+    }
 }
 
 export function updateLiveMetrics(

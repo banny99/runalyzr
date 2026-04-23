@@ -23,13 +23,6 @@ export function initVideoPlayer(
   video.addEventListener('seeked', callbacks.onSeeked);
   video.addEventListener('loadedmetadata', callbacks.onLoadedMetadata);
 
-  // Show playback controls only for file video, not camera stream
-  video.addEventListener('loadedmetadata', () => {
-    if (video.srcObject) return;
-    const controls = document.getElementById('playback-controls');
-    if (controls) controls.style.display = 'flex';
-  });
-
   const playPauseBtn = document.getElementById('play-pause') as HTMLButtonElement | null;
   const frameBackBtn = document.getElementById('frame-back') as HTMLButtonElement | null;
   const frameForwardBtn = document.getElementById('frame-forward') as HTMLButtonElement | null;
