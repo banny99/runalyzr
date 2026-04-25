@@ -91,6 +91,7 @@ export function initOverlay(
     landmarkIndex: number,
     label: string,
   ) {
+    if (!visible) return;
     const lm = landmarks[landmarkIndex];
     if (!lm || (lm.visibility ?? 1) < 0.4) return;
     ctx.fillStyle = '#ffffff';

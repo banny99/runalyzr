@@ -164,6 +164,8 @@ textarea { resize: vertical; }
   display: none; /* shown when camera or video is active */
   position: relative;
   width: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
   background: #000;
   flex-shrink: 0;
 }
@@ -181,7 +183,9 @@ textarea { resize: vertical; }
 #video-container.frame-green::after { border: 3px solid var(--status-green); }
 #video {
   width: 100%;
+  max-height: 100dvh;
   display: block;
+  object-fit: contain;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
 }
