@@ -94,6 +94,7 @@ textarea { resize: vertical; }
   position: relative; /* required for absolute children like setup-guidance */
 }
 .tab-panel.active { display: flex; }
+#camera-panel { overflow: hidden; }
 
 /* ── Bottom tab bar (phone only) ─────────────────────────── */
 #tab-bar {
@@ -164,10 +165,11 @@ textarea { resize: vertical; }
   display: none; /* shown when camera or video is active */
   position: relative;
   width: 100%;
-  max-height: 100dvh;
+  min-height: 0;
   overflow: hidden;
   background: #000;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  flex: 1;
 }
 #video-container.frame-grey::after,
 #video-container.frame-red::after,
@@ -183,9 +185,9 @@ textarea { resize: vertical; }
 #video-container.frame-green::after { border: 3px solid var(--status-green); }
 #video {
   width: 100%;
-  max-height: 100dvh;
+  height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
 }
