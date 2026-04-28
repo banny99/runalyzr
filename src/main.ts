@@ -141,9 +141,10 @@ async function main() {
       manualView = null;
       overlay.syncSizeIfReady();
     },
-    onPlay:   () => loop.start(),
+    onPlay:   () => { overlay.syncSize(); loop.start(); },
     onPause:  () => { loop.stop(); runAnalysis(loop.getFrames()); },
     onSeeked: () => {
+      overlay.syncSize();
       const lm = loop.getCurrentLandmarks();
       if (lm) overlay.drawSkeleton(lm, lastResults ? buildJointStatuses(lastResults) : {});
     },

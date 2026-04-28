@@ -25,9 +25,10 @@ export function initOverlay(
   let visible = true;
 
   function syncSize() {
-    const container = canvas.parentElement;
-    canvas.width  = video.videoWidth  || container?.clientWidth  || video.clientWidth;
-    canvas.height = video.videoHeight || container?.clientHeight || video.clientHeight;
+    if (video.videoWidth > 0) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
   }
 
   function syncSizeIfReady() {
