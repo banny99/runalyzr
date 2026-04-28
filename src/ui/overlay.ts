@@ -24,11 +24,37 @@ export function initOverlay(
   const ctx = canvas.getContext('2d')!;
   let visible = true;
 
+  // Re-sync canvas position whenever the container is resized (orientation change, etc.)
+  const ro = new ResizeObserver(() => { if (video.videoWidth > 0) syncSize(); });
+  ro.observe(canvas.parentElement!);
+
   function syncSize() {
-    if (video.videoWidth > 0) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
+    if (video.videoWidth === 0) return;
+    // Set canvas intrinsic resolution to match the video frame
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    // Position canvas CSS to exactly cover the rendered video content area
+    // (object-fit:contain letterboxes the video — canvas must match, not fill the container)
+    const cw = video.clientWidth;
+    const ch = video.clientHeight;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const containerAspect = cw / ch;
+    let renderW: number, renderH: number;
+    if (videoAspect > containerAspect) {
+      // pillarboxed: full width, bars top/bottom
+      renderW = cw;
+      renderH = cw / videoAspect;
+    } else {
+      // letterboxed: full height, bars left/right
+      renderH = ch;
+      renderW = ch * videoAspect;
     }
+    const offsetX = (cw - renderW) / 2;
+    const offsetY = (ch - renderH) / 2;
+    canvas.style.left   = `${offsetX}px`;
+    canvas.style.top    = `${offsetY}px`;
+    canvas.style.width  = `${renderW}px`;
+    canvas.style.height = `${renderH}px`;
   }
 
   function syncSizeIfReady() {

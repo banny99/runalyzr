@@ -79,6 +79,7 @@ textarea { resize: vertical; }
 /* ── App body ────────────────────────────────────────────── */
 #app-body {
   flex: 1;
+  min-height: 0; /* must shrink below content so children can scroll */
   display: flex;
   overflow: hidden;
   position: relative;
