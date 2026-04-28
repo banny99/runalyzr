@@ -95,6 +95,7 @@ textarea { resize: vertical; }
 }
 .tab-panel.active { display: flex; }
 #camera-panel { overflow: hidden; }
+#results-panel { overflow-y: auto; }
 
 /* ── Bottom tab bar (phone only) ─────────────────────────── */
 #tab-bar {
@@ -303,6 +304,7 @@ textarea { resize: vertical; }
 #record-btn.recording {
   background: var(--status-red);
   border-color: var(--status-red);
+  border-radius: 8px;
   animation: record-pulse 1.5s ease-in-out infinite;
 }
 @keyframes record-pulse {

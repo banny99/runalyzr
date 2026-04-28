@@ -25,8 +25,9 @@ export function initOverlay(
   let visible = true;
 
   function syncSize() {
-    canvas.width = video.videoWidth || video.clientWidth;
-    canvas.height = video.videoHeight || video.clientHeight;
+    const container = canvas.parentElement;
+    canvas.width  = video.videoWidth  || container?.clientWidth  || video.clientWidth;
+    canvas.height = video.videoHeight || container?.clientHeight || video.clientHeight;
   }
 
   function syncSizeIfReady() {
