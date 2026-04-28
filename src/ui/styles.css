@@ -88,6 +88,7 @@ textarea { resize: vertical; }
 .tab-panel {
   display: none;
   flex: 1;
+  min-height: 0; /* allows flex child to shrink below content size so overflow works */
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
@@ -190,7 +191,7 @@ textarea { resize: vertical; }
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
 }
