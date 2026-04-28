@@ -394,13 +394,21 @@ async function main() {
     recordBtn.classList.remove('ready', 'recording');
     viewModeBtn.style.display = 'none';
     recIndicator.style.display = 'none';
-    if (video.src) {
-      showVideoFileUI();
+
+    if (wasRecording) {
+      runAnalysis([...cameraFrames], selectedView);
+      // blob will load into player via stopRecording's finalize — stay in video UI
     } else {
+      // ✕ pressed while reviewing video or in setup — discard and go idle
+      if (recordedBlobUrl) {
+        URL.revokeObjectURL(recordedBlobUrl);
+        recordedBlobUrl = null;
+      }
+      video.removeAttribute('src');
+      video.load();
+      shareVideoBtn.style.display = 'none';
       showIdleUI();
     }
-
-    if (wasRecording) runAnalysis([...cameraFrames], selectedView);
   }
 
   function startRecording(): void {
