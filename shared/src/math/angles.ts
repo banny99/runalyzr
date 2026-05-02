@@ -1,4 +1,4 @@
-import type { Landmark, FrameData } from './types';
+import type { Landmark, FrameData } from '../types/index';
 
 export function angleBetweenThreePoints(
   a: Landmark,
@@ -30,10 +30,6 @@ export function midpoint(a: Landmark, b: Landmark): Landmark {
   };
 }
 
-/**
- * Returns peak-to-peak vertical displacement of a landmark across frames, in cm.
- * Approximation: normalised y × 100 ≈ cm (assumes runner fills ~1m of frame height).
- */
 export function verticalDisplacement(
   landmarkIndex: number,
   frames: FrameData[],
@@ -43,4 +39,15 @@ export function verticalDisplacement(
     .filter((y) => y > 0);
   if (ys.length < 2) return 0;
   return (Math.max(...ys) - Math.min(...ys)) * 100;
+}
+
+export function lateralDisplacement(
+  landmarkIndex: number,
+  frames: FrameData[],
+): number {
+  const xs = frames
+    .map((f) => f.landmarks[landmarkIndex]?.x ?? 0)
+    .filter((x) => x > 0);
+  if (xs.length < 2) return 0;
+  return (Math.max(...xs) - Math.min(...xs)) * 100;
 }

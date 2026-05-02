@@ -1,13 +1,13 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-import { MEDIAPIPE_CDN, HEAVY_MODEL_URL } from '../config/defaults';
-import type { LandmarkArray } from '../analysis/types';
+import type { LandmarkArray } from '../types/index';
 
 export async function initLandmarker(
-  modelUrl: string = HEAVY_MODEL_URL,
+  modelUrl: string,
+  wasmPath: string,
   mode: 'VIDEO' | 'LIVE_STREAM' = 'VIDEO',
   onResult?: (landmarks: LandmarkArray, timestamp: number) => void,
 ): Promise<PoseLandmarker> {
-  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
+  const vision = await FilesetResolver.forVisionTasks(wasmPath);
 
   return PoseLandmarker.createFromOptions(vision, {
     baseOptions: {

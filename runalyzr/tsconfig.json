@@ -8,7 +8,14 @@
     "noUnusedParameters": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@runalyzr/shared/math": ["../shared/src/math/angles.ts"],
+      "@runalyzr/shared/types": ["../shared/src/types/index.ts"],
+      "@runalyzr/shared/pose": ["../shared/src/pose/landmarker.ts"],
+      "@runalyzr/shared/pdf": ["../shared/src/pdf/renderer.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

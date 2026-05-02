@@ -118,7 +118,9 @@ async function main() {
       (v) => { manualView = v; runAnalysis(lastFrames, manualView); },
       ()  => { manualView = null; runAnalysis(lastFrames, null); },
     );
-    const qualityWarnings = evaluateVideoQuality(frames, view === 'unknown' ? null : view);
+    const safeView: 'sagittal' | 'frontal' | null =
+      (view === 'sagittal' || view === 'frontal') ? view : null;
+    const qualityWarnings = evaluateVideoQuality(frames, safeView);
     if (qualityWarnings.length > 0) showQualityWarning(qualityWarnings);
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
   }

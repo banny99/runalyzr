@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bikealyzr</title>
+  </head>
+  <body>
+    <!-- Mode selector -->
+    <header id="app-header">
+      <div id="app-title">Bikealyzr</div>
+      <div id="mode-tabs">
+        <button class="mode-tab active" data-mode="fit">Fit</button>
+        <button class="mode-tab" data-mode="ride">Ride</button>
+      </div>
+    </header>
+
+    <!-- ── FIT MODE ─────────────────────────────────────────────────── -->
+    <main id="fit-mode" class="mode-panel active">
+      <div id="fit-layout">
+        <!-- Left: camera/photo panel -->
+        <div id="fit-camera-panel" class="tab-panel active" data-tab="camera">
+          <div id="fit-idle">
+            <p>Guided bike fit from photos.</p>
+            <button id="fit-start-btn" class="primary-btn">Start Fit Session</button>
+          </div>
+          <div id="fit-guide-panel" hidden>
+            <div id="fit-guide-header">
+              <span id="fit-step-label"></span>
+              <button id="fit-discard-btn" class="fit-discard-btn">✕ Discard</button>
+            </div>
+            <div id="fit-position-select" hidden>
+              <!-- populated by JS -->
+            </div>
+            <div id="fit-step-ui">
+              <div id="fit-position-header">
+                <span id="fit-view-label">Side View</span>
+              </div>
+              <div id="fit-position-name"></div>
+              <div id="fit-instructions"></div>
+              <div id="fit-photo-area">
+                <div id="fit-canvas-wrap" hidden>
+                  <canvas id="fit-canvas"></canvas>
+                </div>
+                <div id="fit-upload-area">
+                  <input type="file" id="fit-file-input" accept="image/*" capture="environment" hidden />
+                  <button id="fit-upload-btn" class="primary-btn">Take / Upload Photo</button>
+                </div>
+              </div>
+              <div id="fit-nav">
+                <button id="fit-prev-btn" disabled>← Back</button>
+                <button id="fit-retake-btn" hidden>Retake</button>
+                <button id="fit-next-btn" disabled>Next →</button>
+                <button id="fit-skip-btn">Skip →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: fit results -->
+        <div id="fit-results-panel" class="tab-panel" data-tab="results">
+          <div id="fit-results-empty">
+            <p>Complete the fit session to see measurements.</p>
+          </div>
+          <div id="fit-results-content" hidden>
+            <div id="fit-metrics-sections"></div>
+            <div id="fit-findings"></div>
+            <button id="fit-export-btn" class="primary-btn" hidden>Export PDF</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── RIDE MODE ────────────────────────────────────────────────── -->
+    <main id="ride-mode" class="mode-panel">
+      <div id="ride-layout">
+        <!-- Left: video panel -->
+        <div id="ride-video-panel" class="tab-panel active" data-tab="camera">
+          <div id="ride-view-buttons">
+            <div id="ride-view-group">
+              <button class="view-btn active" data-view="sagittal">Side View</button>
+              <button class="view-btn" data-view="rear">Rear View</button>
+              <button class="view-btn" data-view="front">Front View</button>
+            </div>
+            <button id="ride-new-btn" class="fit-discard-btn" hidden>✕ Discard</button>
+          </div>
+          <div id="ride-idle">
+            <p>Dynamic analysis from video on a trainer.</p>
+            <input type="file" id="ride-file-input" accept="video/*" hidden />
+            <button id="ride-upload-btn" class="primary-btn">Upload Video</button>
+            <button id="ride-camera-btn" class="primary-btn">Use Camera</button>
+          </div>
+          <div id="ride-video-wrap" hidden>
+            <video id="ride-video" playsinline muted></video>
+            <canvas id="ride-overlay"></canvas>
+            <div id="setup-overlay">
+              <button id="setup-toggle" aria-label="Toggle setup checklist">
+                <span id="setup-toggle-icon">⚠</span>
+                <span id="setup-toggle-label">Setup</span>
+              </button>
+              <div id="setup-panel" class="open">
+                <ul id="setup-checklist">
+                  <li id="check-stable"      class="check-pending">Detecting pose…</li>
+                  <li id="check-body-frame"  class="check-pending">Full body in frame</li>
+                  <li id="check-lighting"    class="check-pending">Adequate lighting</li>
+                  <li id="check-orientation" class="check-pending">Correct orientation</li>
+                  <li id="check-distance"    class="check-pending">Good distance</li>
+                  <li id="check-camera-pos"  class="check-pending">Camera position</li>
+                </ul>
+                <p id="setup-hint"></p>
+              </div>
+            </div>
+            <button id="ride-record-btn" class="ride-record-btn" disabled hidden>⏺</button>
+            <button id="ride-camera-close-btn" class="ride-camera-close-btn" hidden>✕</button>
+            <button id="ride-camera-open-btn" class="ride-camera-open-overlay" hidden>📷 Camera</button>
+          </div>
+        </div>
+
+        <!-- Right: ride results -->
+        <div id="ride-results-panel" class="tab-panel" data-tab="results">
+          <div id="ride-results-empty">
+            <p>Record or upload a video to see analysis.</p>
+          </div>
+          <div id="ride-results-content" hidden>
+            <div id="ride-view-selector"></div>
+            <div id="ride-metrics-sections"></div>
+            <div id="ride-findings"></div>
+            <button id="ride-export-btn" class="primary-btn" hidden>Export PDF</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Report modal -->
+    <div id="report-modal" hidden>
+      <div id="modal-scrim"></div>
+      <div id="modal-content">
+        <button id="modal-close">✕</button>
+        <h2>Export Report</h2>
+        <label>Client name<input type="text" id="client-name" placeholder="Optional" /></label>
+        <label>Notes<textarea id="session-notes" placeholder="Optional session notes…"></textarea></label>
+        <button id="generate-pdf-btn" class="primary-btn">Generate PDF</button>
+      </div>
+    </div>
+
+    <div id="loading-msg" hidden>Loading pose model…</div>
+
+    <!-- Phone tab bar -->
+    <nav id="tab-bar">
+      <button class="tab active" data-tab="camera">Camera</button>
+      <button class="tab" data-tab="results">Results</button>
+    </nav>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
