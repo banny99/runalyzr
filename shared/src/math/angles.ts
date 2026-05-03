@@ -38,7 +38,9 @@ export function verticalDisplacement(
     .map((f) => f.landmarks[landmarkIndex]?.y ?? 0)
     .filter((y) => y > 0);
   if (ys.length < 2) return 0;
-  return (Math.max(...ys) - Math.min(...ys)) * 100;
+  let lo = ys[0], hi = ys[0];
+  for (const y of ys) { if (y < lo) lo = y; if (y > hi) hi = y; }
+  return (hi - lo) * 100;
 }
 
 export function lateralDisplacement(
@@ -49,5 +51,7 @@ export function lateralDisplacement(
     .map((f) => f.landmarks[landmarkIndex]?.x ?? 0)
     .filter((x) => x > 0);
   if (xs.length < 2) return 0;
-  return (Math.max(...xs) - Math.min(...xs)) * 100;
+  let lo = xs[0], hi = xs[0];
+  for (const x of xs) { if (x < lo) lo = x; if (x > hi) hi = x; }
+  return (hi - lo) * 100;
 }

@@ -129,7 +129,9 @@ export function calculateVerticalOscillation(frames: FrameData[]): number | null
     })
     .filter((y): y is number => y !== null && y > 0);
   if (midYs.length < 2) return null;
-  return (Math.max(...midYs) - Math.min(...midYs)) * 100;
+  let lo = midYs[0], hi = midYs[0];
+  for (const y of midYs) { if (y < lo) lo = y; if (y > hi) hi = y; }
+  return (hi - lo) * 100;
 }
 
 export function calculateOverstriding(

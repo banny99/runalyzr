@@ -18,7 +18,9 @@ export function calculateRearMetrics(
       return (lh.x + rh.x) / 2;
     }).filter((x): x is number => x !== null);
     if (hipXs.length < 2) return null;
-    return (Math.max(...hipXs) - Math.min(...hipXs)) * 100;
+    let lo = hipXs[0], hi = hipXs[0];
+    for (const x of hipXs) { if (x < lo) lo = x; if (x > hi) hi = x; }
+    return (hi - lo) * 100;
   })();
 
   // Pelvic obliquity — average absolute left-right hip height asymmetry
