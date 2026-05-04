@@ -22,7 +22,7 @@ async function main() {
 
   const video              = document.getElementById('video')              as HTMLVideoElement;
   const canvas             = document.getElementById('overlay')            as HTMLCanvasElement;
-  const fileInput          = document.getElementById('file-input')         as HTMLInputElement;
+  const fileInput          = Object.assign(document.createElement('input'), { type: 'file', accept: 'video/mp4,video/quicktime' });
   const toggleOverlayBtn   = document.getElementById('toggle-overlay-btn') as HTMLButtonElement;
   const exportPdfBtnTablet = document.getElementById('export-pdf-btn')     as HTMLButtonElement;
   const exportPdfBtnPhone  = document.getElementById('export-pdf-phone')   as HTMLButtonElement;
