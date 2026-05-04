@@ -557,6 +557,62 @@ async function main() {
     mediaRecorder = null;
   }
 
+  async function runSilentAnalysis(): Promise<void> {
+    analysing = true;
+
+    const overlayEl  = document.getElementById('analyse-overlay') as HTMLElement;
+    const pctEl      = document.getElementById('analyse-overlay-pct') as HTMLElement;
+    const analyseBtn = document.getElementById('analyse-btn') as HTMLButtonElement;
+
+    overlayEl.style.display = 'flex';
+    analyseBtn.disabled = true;
+
+    video.pause();
+
+    const duration = video.duration;
+    const step     = 1 / 30;
+    const frames: FrameData[] = [];
+    let   ts = 0;
+
+    for (let t = 0; t <= duration; t += step) {
+      if (!analysing) break;
+
+      video.currentTime = t;
+      await new Promise<void>(resolve => {
+        video.addEventListener('seeked', () => resolve(), { once: true });
+      });
+
+      if (!analysing) break;
+
+      const result = landmarker.detectForVideo(video, ts);
+      ts += Math.round(step * 1000);
+
+      if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
+        frames.push({
+          landmarks:      result.landmarks[0]      as LandmarkArray,
+          worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+          timestamp:      t * 1000,
+        });
+      }
+
+      const pct = Math.min(100, Math.round((t / duration) * 100));
+      pctEl.textContent = `Analysing… ${pct}%`;
+    }
+
+    overlayEl.style.display = 'none';
+    analyseBtn.disabled = false;
+
+    if (!analysing) return;
+
+    analysing = false;
+    runAnalysis(frames);
+    if (window.innerWidth < 768) switchTab('results');
+  }
+
+  document.getElementById('analyse-btn')!.addEventListener('click', () => {
+    runSilentAnalysis().catch(console.error);
+  });
+
   cameraOpenBtn.addEventListener('click', () => openCamera().catch(console.error));
   cameraCloseBtn?.addEventListener('click', () => closeCamera());
 
