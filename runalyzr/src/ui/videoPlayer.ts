@@ -9,12 +9,15 @@ export function initVideoPlayer(
   video: HTMLVideoElement,
   fileInput: HTMLInputElement,
   callbacks: VideoPlayerCallbacks,
-): void {
+): () => void {
+  let currentObjectUrl: string | null = null;
+
   fileInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    video.src = url;
+    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = URL.createObjectURL(file);
+    video.src = currentObjectUrl;
     video.load();
   });
 
@@ -23,10 +26,10 @@ export function initVideoPlayer(
   video.addEventListener('seeked', callbacks.onSeeked);
   video.addEventListener('loadedmetadata', callbacks.onLoadedMetadata);
 
-  const playPauseBtn = document.getElementById('play-pause') as HTMLButtonElement | null;
-  const frameBackBtn = document.getElementById('frame-back') as HTMLButtonElement | null;
+  const playPauseBtn    = document.getElementById('play-pause')    as HTMLButtonElement | null;
+  const frameBackBtn    = document.getElementById('frame-back')    as HTMLButtonElement | null;
   const frameForwardBtn = document.getElementById('frame-forward') as HTMLButtonElement | null;
-  const speedSelect = document.getElementById('speed-select') as HTMLSelectElement | null;
+  const speedSelect     = document.getElementById('speed-select')  as HTMLSelectElement | null;
 
   function syncPlayPause(): void {
     if (playPauseBtn) playPauseBtn.textContent = video.paused ? '▶' : '⏸';
@@ -59,7 +62,7 @@ export function initVideoPlayer(
     video.playbackRate = parseFloat(speedSelect.value);
   });
 
-  document.addEventListener('keydown', (e) => {
+  function onKeydown(e: KeyboardEvent): void {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       video.pause();
@@ -69,7 +72,10 @@ export function initVideoPlayer(
       video.pause();
       video.currentTime = Math.min(video.duration, video.currentTime + 1 / 30);
     }
-  });
+  }
+  document.addEventListener('keydown', onKeydown);
+
+  return () => document.removeEventListener('keydown', onKeydown);
 }
 
 export async function startCamera(video: HTMLVideoElement): Promise<void> {
