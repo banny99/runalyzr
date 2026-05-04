@@ -27,12 +27,14 @@ export function evaluateMetric(
   const t = THRESHOLDS[key];
   if (!t) return 'unknown';
 
+  // Green is checked first; amber ranges that touch the green boundary are
+  // half-open [amber.lo, green.lo) — the boundary value itself is green.
   if (value >= t.green[0] && value <= t.green[1]) return 'green';
-  if (value >= t.amber[0] && value <= t.amber[1]) return 'amber';
+  if (value >= t.amber[0] && value < t.green[0]) return 'amber';
+  if (value > t.green[1] && value <= t.amber[1]) return 'amber';
 
-  // Values better than the optimal bound are still green
   if (t.direction === 'higher_is_worse' && value < t.green[0]) return 'green';
-  if (t.direction === 'lower_is_worse' && value > t.green[1]) return 'green';
+  if (t.direction === 'lower_is_worse'  && value > t.green[1]) return 'green';
 
   return 'red';
 }

@@ -178,6 +178,7 @@ export function evaluateVideoQuality(
   };
 
   for (const frame of sampled) {
+    // Pass 100 consecutive frames to force stable=true — we're evaluating a completed recording.
     const checks = evaluateSetupChecks(frame.landmarks, 100, selectedView);
     if (!checks.orientation)    counts.orientation++;
     if (!checks.bodyInFrame)    counts.bodyInFrame++;
