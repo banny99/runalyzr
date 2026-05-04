@@ -230,13 +230,13 @@ async function main() {
     shareVideoBtn.style.display = 'none';
     hideReviewBar();
   }
-  function showVideoFileUI(): void {
+  function showVideoFileUI(showAnalyse = true): void {
     cameraIdleEl.style.display = 'none';
     videoContainerEl.style.display = 'block';
     videoTopRightEl.style.display = 'flex';
     recordBtn.style.display = 'none';
     playbackCtrlsEl.style.display = 'flex';
-    showReviewBar();
+    if (showAnalyse) showReviewBar();
   }
 
   function openReportModal() {
@@ -537,7 +537,7 @@ async function main() {
         video.src = blobUrl;
         video.load();
         shareVideoBtn.style.display = 'flex';
-        showVideoFileUI();
+        showVideoFileUI(false);
       } else {
         showIdleUI();
       }
@@ -578,7 +578,6 @@ async function main() {
     }
     const step     = 1 / 30;
     const frames: FrameData[] = [];
-    let   ts = 0;
 
     for (let t = 0; t <= duration; t += step) {
       if (!analysing) break;
@@ -598,8 +597,7 @@ async function main() {
 
       if (!analysing) break;
 
-      const result = landmarker.detectForVideo(video, ts);
-      ts += Math.round(step * 1000);
+      const result = landmarker.detectForVideo(video, Math.round(t * 1000));
 
       if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
         frames.push({
