@@ -143,7 +143,8 @@ async function main() {
     updateLiveMetrics(null, detectCameraView(landmarks), loop.getFps());
   });
 
-  initVideoPlayer(video, fileInput, {
+  // keydown cleanup — call this if video player is ever torn down (see Task 10)
+  const cleanupVideoPlayer = initVideoPlayer(video, fileInput, {
     onLoadedMetadata: () => {
       manualView = null;
       overlay.syncSizeIfReady();
@@ -156,6 +157,7 @@ async function main() {
       if (lm) overlay.drawSkeleton(lm, lastResults ? buildJointStatuses(lastResults) : {});
     },
   });
+  void cleanupVideoPlayer;
 
   video.addEventListener('ended', () => { loop.stop(); });
 

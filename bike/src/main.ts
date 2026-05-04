@@ -350,6 +350,7 @@ async function main() {
   rideCameraBtn.addEventListener('click', () => rideCameraOpenBtn.click());
   let mediaRecorder: MediaRecorder | null = null;
   const recordedChunks: Blob[] = [];
+  let recordingLockTimeout: ReturnType<typeof window.setTimeout> | null = null;
 
   rideCameraOpenBtn.addEventListener('click', async () => {
     try {
@@ -403,6 +404,10 @@ async function main() {
       runRideAnalysis([...cameraFrames]);
     }
     cameraState = 'closed';
+    if (recordingLockTimeout) {
+      clearTimeout(recordingLockTimeout);
+      recordingLockTimeout = null;
+    }
     rideCanvas.width = 0;
     rideCanvas.height = 0;
     rideCameraOpenBtn.hidden = false;
@@ -422,14 +427,11 @@ async function main() {
       rideRecordBtn.textContent = '⏹';
 
       rideRecordBtn.disabled = true;
-      let lockSecondsLeft = 5;
-      const lockInterval = window.setInterval(() => {
-        lockSecondsLeft--;
-        if (lockSecondsLeft <= 0) {
-          clearInterval(lockInterval);
-          rideRecordBtn.disabled = false;
-        }
-      }, 1000);
+      if (recordingLockTimeout) clearTimeout(recordingLockTimeout);
+      recordingLockTimeout = window.setTimeout(() => {
+        recordingLockTimeout = null;
+        rideRecordBtn.disabled = false;
+      }, 5000);
 
       if (typeof MediaRecorder !== 'undefined' && rideVideo.srcObject) {
         const mimeType = ['video/webm;codecs=vp9', 'video/webm']

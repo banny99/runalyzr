@@ -28,7 +28,7 @@ export function evaluateMetric(
   if (!t) return 'unknown';
 
   // Green is checked first; amber ranges that touch the green boundary are
-  // half-open [amber.lo, green.lo) — the boundary value itself is green.
+  // half-open [amber.lo, green.lo) and (green.hi, amber.hi] — boundary values are green.
   if (value >= t.green[0] && value <= t.green[1]) return 'green';
   if (value >= t.amber[0] && value < t.green[0]) return 'amber';
   if (value > t.green[1] && value <= t.amber[1]) return 'amber';
