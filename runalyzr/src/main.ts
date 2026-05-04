@@ -149,7 +149,7 @@ async function main() {
       overlay.syncSizeIfReady();
     },
     onPlay:   () => { overlay.syncSize(); loop.start(); },
-    onPause:  () => { loop.stop(); runAnalysis(loop.getFrames()); },
+    onPause:  () => { loop.stop(); },
     onSeeked: () => {
       overlay.syncSize();
       const lm = loop.getCurrentLandmarks();
@@ -157,7 +157,7 @@ async function main() {
     },
   });
 
-  video.addEventListener('ended', () => { loop.stop(); runAnalysis(loop.getFrames()); });
+  video.addEventListener('ended', () => { loop.stop(); });
 
   // ── Camera mode state machine ───────────────────────────────────────────
 
@@ -172,6 +172,7 @@ async function main() {
   let recStartTime = 0;
   const cameraFrames: FrameData[] = [];
   let mediaRecorder: MediaRecorder | null = null;
+  let analysing = false;
   const recordedChunks: Blob[] = [];
   let recordedBlobUrl: string | null = null;
   let compositeCanvas: HTMLCanvasElement | null = null;
@@ -206,6 +207,18 @@ async function main() {
     playbackCtrlsEl.style.display = 'none';
     shareVideoBtn.style.display = 'none';
   }
+  function showReviewBar(): void {
+    const bar = document.getElementById('review-bar') as HTMLElement;
+    const btn = document.getElementById('analyse-btn') as HTMLButtonElement;
+    bar.hidden = false;
+    btn.disabled = false;
+  }
+
+  function hideReviewBar(): void {
+    const bar = document.getElementById('review-bar') as HTMLElement;
+    bar.hidden = true;
+  }
+
   function showIdleUI(): void {
     cameraIdleEl.style.display = 'flex';
     videoContainerEl.style.display = 'none';
@@ -215,6 +228,7 @@ async function main() {
     setupOverlayEl.classList.remove('visible');
     liveMetricsEl.style.display = 'none';
     shareVideoBtn.style.display = 'none';
+    hideReviewBar();
   }
   function showVideoFileUI(): void {
     cameraIdleEl.style.display = 'none';
@@ -222,6 +236,7 @@ async function main() {
     videoTopRightEl.style.display = 'flex';
     recordBtn.style.display = 'none';
     playbackCtrlsEl.style.display = 'flex';
+    showReviewBar();
   }
 
   function openReportModal() {
@@ -390,6 +405,7 @@ async function main() {
   }
 
   function closeCamera(): void {
+    analysing = false;
     const wasRecording = cameraState === 'recording';
     cameraState = 'closed';
     cameraRunning = false;
