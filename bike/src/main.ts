@@ -421,6 +421,16 @@ async function main() {
       rideRecordBtn.classList.add('recording');
       rideRecordBtn.textContent = '⏹';
 
+      rideRecordBtn.disabled = true;
+      let lockSecondsLeft = 5;
+      const lockInterval = window.setInterval(() => {
+        lockSecondsLeft--;
+        if (lockSecondsLeft <= 0) {
+          clearInterval(lockInterval);
+          rideRecordBtn.disabled = false;
+        }
+      }, 1000);
+
       if (typeof MediaRecorder !== 'undefined' && rideVideo.srcObject) {
         const mimeType = ['video/webm;codecs=vp9', 'video/webm']
           .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
@@ -435,6 +445,7 @@ async function main() {
       cameraState = 'closed';
       rideRecordBtn.classList.remove('recording');
       rideRecordBtn.textContent = '⏺';
+      rideRecordBtn.disabled = false;
       if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
       mediaRecorder = null;
       runRideAnalysis([...cameraFrames]);
