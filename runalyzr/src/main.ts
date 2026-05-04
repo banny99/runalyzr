@@ -570,6 +570,12 @@ async function main() {
     video.pause();
 
     const duration = video.duration;
+    if (!Number.isFinite(duration) || duration <= 0) {
+      overlayEl.style.display = 'none';
+      analyseBtn.disabled = false;
+      analysing = false;
+      return;
+    }
     const step     = 1 / 30;
     const frames: FrameData[] = [];
     let   ts = 0;
@@ -578,8 +584,16 @@ async function main() {
       if (!analysing) break;
 
       video.currentTime = t;
-      await new Promise<void>(resolve => {
-        video.addEventListener('seeked', () => resolve(), { once: true });
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          video.removeEventListener('seeked',  done);
+          video.removeEventListener('abort',   done);
+          video.removeEventListener('emptied', done);
+          resolve();
+        };
+        video.addEventListener('seeked',  done, { once: true });
+        video.addEventListener('abort',   done, { once: true });
+        video.addEventListener('emptied', done, { once: true });
       });
 
       if (!analysing) break;
@@ -610,6 +624,7 @@ async function main() {
   }
 
   document.getElementById('analyse-btn')!.addEventListener('click', () => {
+    if (analysing) return;
     runSilentAnalysis().catch(console.error);
   });
 
