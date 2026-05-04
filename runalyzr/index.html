@@ -81,6 +81,16 @@
             <option value="1" selected>1×</option>
           </select>
         </div>
+
+        <!-- Analysis progress overlay -->
+        <div id="analyse-overlay">
+          <span id="analyse-overlay-pct">Analysing… 0%</span>
+        </div>
+      </div>
+
+      <!-- Review bar: shown when a video file is loaded, hidden otherwise -->
+      <div id="review-bar" hidden>
+        <button id="analyse-btn">Analyse</button>
       </div>
 
       <!-- Setup overlay: toggle button + collapsible checklist (camera setup phase) -->
