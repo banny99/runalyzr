@@ -24,7 +24,7 @@ export interface PedalCycle {
 
 // ── Ride analysis results ──────────────────────────────────────────────────
 
-export interface SagittalMetrics {
+export interface SagittalMetrics extends Record<string, MetricResult | null> {
   kneeExtensionBDC:       MetricResult | null;
   kneeFlexionTDC:         MetricResult | null;
   hipAngleTDC:            MetricResult | null;
@@ -37,14 +37,14 @@ export interface SagittalMetrics {
   cadence:                MetricResult | null;
 }
 
-export interface RearMetrics {
+export interface RearMetrics extends Record<string, MetricResult | null> {
   hipRock:           MetricResult | null;
   pelvicObliquity:   MetricResult | null;
   kneeVarusValgus:   MetricResult | null;
   heelAlignment:     MetricResult | null;
 }
 
-export interface FrontMetrics {
+export interface FrontMetrics extends Record<string, MetricResult | null> {
   kneeSymmetry:       MetricResult | null;
   elbowWidthSymmetry: MetricResult | null;
   shoulderLevel:      MetricResult | null;

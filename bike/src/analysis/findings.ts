@@ -68,8 +68,8 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
   },
 };
 
-function findingsFromMetricGroup(
-  metrics: Record<string, MetricResult | null>,
+function findingsFromMetricGroup<T extends Record<string, MetricResult | null>>(
+  metrics: T,
 ): Finding[] {
   const findings: Finding[] = [];
   for (const [key, result] of Object.entries(metrics) as [string, MetricResult | null][]) {
@@ -86,17 +86,17 @@ function findingsFromMetricGroup(
 }
 
 export function generateSagittalFindings(metrics: SagittalMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics as unknown as Record<string, MetricResult | null>).sort((a, b) =>
+  return findingsFromMetricGroup(metrics).sort((a, b) =>
     (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
 }
 
 export function generateRearFindings(metrics: RearMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics as unknown as Record<string, MetricResult | null>).sort((a, b) =>
+  return findingsFromMetricGroup(metrics).sort((a, b) =>
     (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
 }
 
 export function generateFrontFindings(metrics: FrontMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics as unknown as Record<string, MetricResult | null>).sort((a, b) =>
+  return findingsFromMetricGroup(metrics).sort((a, b) =>
     (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
 }
 
