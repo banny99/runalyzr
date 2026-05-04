@@ -41,6 +41,9 @@ jobs:
           cp -r runalyzr/dist/. deploy/run/
           cp -r bike/dist/. deploy/bike/
 
+      - name: Add landing page
+        run: cp landing/index.html deploy/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: deploy
