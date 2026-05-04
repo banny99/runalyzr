@@ -22,7 +22,7 @@ async function main() {
 
   const video              = document.getElementById('video')              as HTMLVideoElement;
   const canvas             = document.getElementById('overlay')            as HTMLCanvasElement;
-  const fileInput          = Object.assign(document.createElement('input'), { type: 'file', accept: 'video/mp4,video/quicktime' });
+  const fileInput          = Object.assign(document.createElement('input'), { type: 'file', accept: 'video/mp4,video/quicktime', style: 'display:none' });
   const toggleOverlayBtn   = document.getElementById('toggle-overlay-btn') as HTMLButtonElement;
   const exportPdfBtnTablet = document.getElementById('export-pdf-btn')     as HTMLButtonElement;
   const exportPdfBtnPhone  = document.getElementById('export-pdf-phone')   as HTMLButtonElement;
@@ -56,8 +56,13 @@ async function main() {
   document.querySelectorAll('.tab').forEach(tab =>
     tab.addEventListener('click', () => switchTab((tab as HTMLElement).dataset.tab!)));
 
-  uploadBtnPhone?.addEventListener('click', () => fileInput.click());
-  uploadBtnTablet?.addEventListener('click', () => fileInput.click());
+  function openFilePicker() {
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    fileInput.addEventListener('change', () => document.body.removeChild(fileInput), { once: true });
+  }
+  uploadBtnPhone?.addEventListener('click', openFilePicker);
+  uploadBtnTablet?.addEventListener('click', openFilePicker);
 
   let landmarker: Awaited<ReturnType<typeof initLandmarker>>;
   try {
