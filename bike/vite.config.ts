@@ -3,7 +3,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { resolve } from 'path';
 
 export default defineConfig({
-  base: '/bike/',
+  base: '/runalyzr/bike/',
   publicDir: resolve(__dirname, '../runalyzr/public'),
   resolve: {
     alias: {
