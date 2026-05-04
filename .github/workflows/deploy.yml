@@ -37,9 +37,8 @@ jobs:
 
       - name: Merge build outputs
         run: |
-          mkdir -p deploy
-          cp -r runalyzr/dist/. deploy/
-          mkdir -p deploy/bike
+          mkdir -p deploy/run deploy/bike
+          cp -r runalyzr/dist/. deploy/run/
           cp -r bike/dist/. deploy/bike/
 
       - uses: actions/upload-pages-artifact@v3

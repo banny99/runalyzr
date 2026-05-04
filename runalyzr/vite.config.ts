@@ -3,7 +3,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { resolve } from 'path';
 
 export default defineConfig({
-  base: '/runalyzr/',
+  base: '/runalyzr/run/',
   resolve: {
     alias: {
       '@runalyzr/shared/math':  resolve(__dirname, '../shared/src/math/angles.ts'),
