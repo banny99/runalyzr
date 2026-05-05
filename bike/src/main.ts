@@ -315,131 +315,154 @@ async function main() {
   rideVideo.addEventListener('ended', () => { loop.stop(); runRideAnalysis(loop.getFrames()); });
 
   // Camera mode for ride
-  let cameraState: string = 'closed';
-  let cameraRunning = false;
-  let cameraRafId = 0;
-  const cameraFrames: FrameData[] = [];
+  function initRideCameraSection() {
+    let cameraState: string = 'closed';
+    let cameraRunning = false;
+    let cameraRafId = 0;
+    const cameraFrames: FrameData[] = [];
+    let mediaRecorder: MediaRecorder | null = null;
+    const recordedChunks: Blob[] = [];
+    let recordingLockTimeout: ReturnType<typeof window.setTimeout> | null = null;
 
-  function resetRideVideo() {
-    loop.stop();
-    if (cameraRunning) {
+    function resetRideVideo() {
+      loop.stop();
+      if (cameraRunning) {
+        cameraRunning = false;
+        cancelAnimationFrame(cameraRafId);
+        stopCamera(rideVideo);
+        rideCameraOpenBtn.hidden = false;
+        rideCameraCloseBtn.hidden = true;
+        rideRecordBtn.hidden = true;
+        rideRecordBtn.disabled = true;
+        rideRecordBtn.classList.remove('recording');
+        setupBuffer.length = 0;
+        cameraState = 'closed';
+      }
+      if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
+      mediaRecorder = null;
+      cameraFrames.length = 0;
+      rideVideo.removeAttribute('src');
+      rideVideo.load();
+      rideCameraOpenBtn.hidden = true;
+      setupOverlayEl.classList.remove('visible');
+      rideIdle.hidden = false;
+      rideVideoWrap.hidden = true;
+      rideNewBtn.hidden = true;
+    }
+
+    rideNewBtn.addEventListener('click', resetRideVideo);
+    rideCameraBtn.addEventListener('click', () => rideCameraOpenBtn.click());
+
+    rideCameraOpenBtn.addEventListener('click', async () => {
+      try {
+        await startCamera(rideVideo);
+        cameraState = 'closed';
+        cameraRunning = true;
+        setupBuffer.length = 0;
+        rideIdle.hidden = true;
+        rideVideoWrap.hidden = false;
+        rideNewBtn.hidden = false;
+        rideCameraOpenBtn.hidden = true;
+        rideCameraCloseBtn.hidden = false;
+        rideRecordBtn.hidden = false;
+        rideRecordBtn.disabled = true;
+        setupOverlayEl.classList.add('visible');
+        setupPanelEl.classList.add('open');
+        overlay.syncSize();
+        rideVideo.addEventListener('resize', () => overlay.syncSize(), { once: true });
+
+        (function cameraLoop() {
+          if (!cameraRunning) return;
+          if (rideVideo.readyState >= 2) {
+            const result = landmarker.detectForVideo(rideVideo, performance.now());
+            if (result.landmarks.length > 0) {
+              const lms = result.landmarks[0] as LandmarkArray;
+              overlay.drawSkeleton(lms, {});
+              updateSetupChecks(lms);
+              if (cameraState === 'recording' && cameraFrames.length < 9000) {
+                cameraFrames.push({
+                  landmarks: lms,
+                  worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+                  timestamp: performance.now(),
+                });
+              }
+            } else {
+              updateSetupChecks(null);
+            }
+          }
+          cameraRafId = requestAnimationFrame(cameraLoop);
+        })();
+      } catch (err) {
+        console.error('Camera error:', err);
+      }
+    });
+
+    rideCameraCloseBtn.addEventListener('click', () => {
       cameraRunning = false;
       cancelAnimationFrame(cameraRafId);
       stopCamera(rideVideo);
+      if (cameraState === 'recording' && cameraFrames.length > 0) {
+        runRideAnalysis([...cameraFrames]);
+      }
+      cameraState = 'closed';
+      if (recordingLockTimeout) {
+        clearTimeout(recordingLockTimeout);
+        recordingLockTimeout = null;
+      }
+      rideCanvas.width = 0;
+      rideCanvas.height = 0;
       rideCameraOpenBtn.hidden = false;
       rideCameraCloseBtn.hidden = true;
       rideRecordBtn.hidden = true;
       rideRecordBtn.disabled = true;
       rideRecordBtn.classList.remove('recording');
-      setupBuffer.length = 0;
-      cameraState = 'closed';
-    }
-    if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
-    mediaRecorder = null;
-    cameraFrames.length = 0;
-    rideVideo.removeAttribute('src');
-    rideVideo.load();
-    rideCameraOpenBtn.hidden = true;
-    setupOverlayEl.classList.remove('visible');
-    rideIdle.hidden = false;
-    rideVideoWrap.hidden = true;
-    rideNewBtn.hidden = true;
+      setupOverlayEl.classList.remove('visible');
+    });
+
+    rideRecordBtn.addEventListener('click', () => {
+      if (cameraState !== 'recording') {
+        cameraState = 'recording';
+        cameraFrames.length = 0;
+        recordedChunks.length = 0;
+        rideRecordBtn.classList.add('recording');
+        rideRecordBtn.textContent = '⏹';
+
+        rideRecordBtn.disabled = true;
+        if (recordingLockTimeout) clearTimeout(recordingLockTimeout);
+        recordingLockTimeout = window.setTimeout(() => {
+          recordingLockTimeout = null;
+          rideRecordBtn.disabled = false;
+        }, 5000);
+
+        if (typeof MediaRecorder !== 'undefined' && rideVideo.srcObject) {
+          const mimeType = ['video/webm;codecs=vp9', 'video/webm']
+            .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+          try {
+            mediaRecorder = new MediaRecorder(rideVideo.srcObject as MediaStream,
+              mimeType ? { mimeType } : {});
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.start(100);
+          } catch { mediaRecorder = null; }
+        }
+      } else {
+        cameraState = 'closed';
+        rideRecordBtn.classList.remove('recording');
+        rideRecordBtn.textContent = '⏺';
+        if (recordingLockTimeout) {
+          clearTimeout(recordingLockTimeout);
+          recordingLockTimeout = null;
+        }
+        rideRecordBtn.disabled = false;
+        if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
+        mediaRecorder = null;
+        runRideAnalysis([...cameraFrames]);
+      }
+    });
+
+    return { cameraFrames };
   }
 
-  rideNewBtn.addEventListener('click', resetRideVideo);
-  rideCameraBtn.addEventListener('click', () => rideCameraOpenBtn.click());
-  let mediaRecorder: MediaRecorder | null = null;
-  const recordedChunks: Blob[] = [];
-
-  rideCameraOpenBtn.addEventListener('click', async () => {
-    try {
-      await startCamera(rideVideo);
-      cameraState = 'closed';
-      cameraRunning = true;
-      setupBuffer.length = 0;
-      rideIdle.hidden = true;
-      rideVideoWrap.hidden = false;
-      rideNewBtn.hidden = false;
-      rideCameraOpenBtn.hidden = true;
-      rideCameraCloseBtn.hidden = false;
-      rideRecordBtn.hidden = false;
-      rideRecordBtn.disabled = true;
-      setupOverlayEl.classList.add('visible');
-      setupPanelEl.classList.add('open');
-      overlay.syncSize();
-      rideVideo.addEventListener('resize', () => overlay.syncSize(), { once: true });
-
-      (function cameraLoop() {
-        if (!cameraRunning) return;
-        if (rideVideo.readyState >= 2) {
-          const result = landmarker.detectForVideo(rideVideo, performance.now());
-          if (result.landmarks.length > 0) {
-            const lms = result.landmarks[0] as LandmarkArray;
-            overlay.drawSkeleton(lms, {});
-            updateSetupChecks(lms);
-            if (cameraState === 'recording' && cameraFrames.length < 9000) {
-              cameraFrames.push({
-                landmarks: lms,
-                worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
-                timestamp: performance.now(),
-              });
-            }
-          } else {
-            updateSetupChecks(null);
-          }
-        }
-        cameraRafId = requestAnimationFrame(cameraLoop);
-      })();
-    } catch (err) {
-      console.error('Camera error:', err);
-    }
-  });
-
-  rideCameraCloseBtn.addEventListener('click', () => {
-    cameraRunning = false;
-    cancelAnimationFrame(cameraRafId);
-    stopCamera(rideVideo);
-    if (cameraState === 'recording' && cameraFrames.length > 0) {
-      runRideAnalysis([...cameraFrames]);
-    }
-    cameraState = 'closed';
-    rideCanvas.width = 0;
-    rideCanvas.height = 0;
-    rideCameraOpenBtn.hidden = false;
-    rideCameraCloseBtn.hidden = true;
-    rideRecordBtn.hidden = true;
-    rideRecordBtn.disabled = true;
-    rideRecordBtn.classList.remove('recording');
-    setupOverlayEl.classList.remove('visible');
-  });
-
-  rideRecordBtn.addEventListener('click', () => {
-    if (cameraState !== 'recording') {
-      cameraState = 'recording';
-      cameraFrames.length = 0;
-      recordedChunks.length = 0;
-      rideRecordBtn.classList.add('recording');
-      rideRecordBtn.textContent = '⏹';
-
-      if (typeof MediaRecorder !== 'undefined' && rideVideo.srcObject) {
-        const mimeType = ['video/webm;codecs=vp9', 'video/webm']
-          .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
-        try {
-          mediaRecorder = new MediaRecorder(rideVideo.srcObject as MediaStream,
-            mimeType ? { mimeType } : {});
-          mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-          mediaRecorder.start(100);
-        } catch { mediaRecorder = null; }
-      }
-    } else {
-      cameraState = 'closed';
-      rideRecordBtn.classList.remove('recording');
-      rideRecordBtn.textContent = '⏺';
-      if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
-      mediaRecorder = null;
-      runRideAnalysis([...cameraFrames]);
-    }
-  });
+  const { cameraFrames } = initRideCameraSection();
 
   rideExportBtn.addEventListener('click', () => openReportModal());
 

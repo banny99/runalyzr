@@ -67,7 +67,9 @@ export function calculateSagittalMetrics(
       return (lh.y + rh.y) / 2;
     }).filter((y): y is number => y !== null);
     if (hipMidYs.length < 2) return null;
-    return (Math.max(...hipMidYs) - Math.min(...hipMidYs)) * 100;
+    let lo = hipMidYs[0], hi = hipMidYs[0];
+    for (const y of hipMidYs) { if (y < lo) lo = y; if (y > hi) hi = y; }
+    return (hi - lo) * 100;
   })();
 
   // Torso angle — shoulder mid to hip mid, relative to horizontal

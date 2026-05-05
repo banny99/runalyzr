@@ -1,12 +1,8 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-export async function initLandmarker(modelUrl, wasmPath, mode = 'VIDEO', onResult) {
-    const vision = await FilesetResolver.forVisionTasks(wasmPath);
+async function buildLandmarker(vision, modelUrl, mode, delegate, onResult) {
     return PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-            modelAssetPath: modelUrl,
-            delegate: 'GPU',
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        baseOptions: { modelAssetPath: modelUrl, delegate },
+        // mediapipe typedefs only list "IMAGE"|"VIDEO" but the runtime also accepts "LIVE_STREAM"
         runningMode: mode,
         numPoses: 1,
         minPoseDetectionConfidence: 0.5,
@@ -22,4 +18,13 @@ export async function initLandmarker(modelUrl, wasmPath, mode = 'VIDEO', onResul
             }
             : {}),
     });
+}
+export async function initLandmarker(modelUrl, wasmPath, mode = 'VIDEO', onResult) {
+    const vision = await FilesetResolver.forVisionTasks(wasmPath);
+    try {
+        return await buildLandmarker(vision, modelUrl, mode, 'GPU', onResult);
+    }
+    catch {
+        return buildLandmarker(vision, modelUrl, mode, 'CPU', onResult);
+    }
 }

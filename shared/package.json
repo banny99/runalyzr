@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./math": "./src/math/angles.ts",
-    "./types": "./src/types/index.ts",
-    "./pose": "./src/pose/landmarker.ts",
-    "./pdf": "./src/pdf/renderer.ts"
+    "./math":  "./src/math/angles.js",
+    "./types": "./src/types/index.js",
+    "./pose":  "./src/pose/landmarker.js",
+    "./pdf":   "./src/pdf/renderer.js"
+  },
+  "peerDependencies": {
+    "@mediapipe/tasks-vision": "*"
   }
 }
