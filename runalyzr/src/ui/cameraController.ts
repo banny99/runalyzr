@@ -12,12 +12,12 @@ type OverlayHandle = ReturnType<typeof initOverlay>;
 export interface CameraControllerDeps {
   video: HTMLVideoElement;
   overlay: OverlayHandle;
+  overlayCanvas: HTMLCanvasElement;
   landmarker: PoseLandmarker;
   liveMetricsEl: HTMLElement;
   setupOverlayEl: HTMLElement;
   setupPanelEl: HTMLElement;
   videoContainerEl: HTMLElement;
-  videoTopRightEl: HTMLElement;
   recordBtn: HTMLButtonElement;
   viewModeBtn: HTMLButtonElement;
   recIndicator: HTMLElement;
@@ -26,7 +26,7 @@ export interface CameraControllerDeps {
   setupToggleEl: HTMLElement;
   setupToggleIcon: HTMLElement;
   onAnalysisReady: (frames: FrameData[], view: 'sagittal' | 'frontal' | null) => void;
-  onBlobUrl: (url: string | null) => void;
+  onRecordingComplete: (blobUrl: string | null) => void;
   getLastResults: () => AnalysisResults | null;
   updateLiveMetrics: (cadence: number | null, view: CameraView, fps: number) => void;
 }
@@ -46,11 +46,11 @@ function applyCheck(
 
 export function initCameraController(deps: CameraControllerDeps) {
   const {
-    video, overlay, landmarker,
-    liveMetricsEl, setupOverlayEl, setupPanelEl, videoContainerEl, videoTopRightEl,
+    video, overlay, overlayCanvas, landmarker,
+    liveMetricsEl, setupOverlayEl, setupPanelEl, videoContainerEl,
     recordBtn, viewModeBtn, recIndicator, recTimerEl, shareVideoBtn,
     setupToggleEl, setupToggleIcon,
-    onAnalysisReady, onBlobUrl, getLastResults, updateLiveMetrics,
+    onAnalysisReady, onRecordingComplete, getLastResults, updateLiveMetrics,
   } = deps;
 
   let cameraState: 'closed' | 'setup' | 'recording' = 'closed';
@@ -246,32 +246,12 @@ export function initCameraController(deps: CameraControllerDeps) {
     viewModeBtn.style.display = 'none';
 
     onAnalysisReady(capturedFrames, viewForAnalysis);
-    if (window.innerWidth < 768) {
-      document.querySelectorAll('.tab').forEach((t) =>
-        (t as HTMLElement).classList.toggle('active', (t as HTMLElement).dataset.tab === 'results'));
-      document.querySelectorAll('.tab-panel').forEach((p) =>
-        (p as HTMLElement).classList.toggle('active', (p as HTMLElement).dataset.tab === 'results'));
-    }
 
     const finalize = (blobUrl: string | null) => {
       compositeCanvas = null;
       compositeCtx = null;
       stopCamera(video);
-      if (blobUrl) {
-        if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
-        recordedBlobUrl = blobUrl;
-        video.src = blobUrl;
-        video.load();
-        shareVideoBtn.style.display = 'flex';
-        // Switch to video file UI
-        videoTopRightEl.style.display = 'flex';
-        document.getElementById('camera-idle')!.style.display = 'none';
-        videoContainerEl.style.display = 'block';
-        document.getElementById('record-btn')!.style.display = 'none';
-        document.getElementById('playback-controls')!.style.display = 'flex';
-      } else {
-        onBlobUrl(null);
-      }
+      onRecordingComplete(blobUrl);
     };
 
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -279,7 +259,15 @@ export function initCameraController(deps: CameraControllerDeps) {
         const blob = recordedChunks.length > 0
           ? new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' })
           : null;
-        finalize(blob ? URL.createObjectURL(blob) : null);
+        const blobUrl = blob ? URL.createObjectURL(blob) : null;
+        if (blobUrl) {
+          if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
+          recordedBlobUrl = blobUrl;
+          video.src = blobUrl;
+          video.load();
+          shareVideoBtn.style.display = 'flex';
+        }
+        finalize(blobUrl);
       };
       mediaRecorder.stop();
     } else {
@@ -342,10 +330,7 @@ export function initCameraController(deps: CameraControllerDeps) {
           }
           if (compositeCtx && compositeCanvas) {
             compositeCtx.drawImage(video, 0, 0, compositeCanvas.width, compositeCanvas.height);
-            compositeCtx.drawImage(
-              document.getElementById('overlay') as HTMLCanvasElement,
-              0, 0, compositeCanvas.width, compositeCanvas.height,
-            );
+            compositeCtx.drawImage(overlayCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height);
           }
           updateLiveMetrics(null, detectCameraView(lms), 30);
         }
@@ -397,7 +382,17 @@ export function initCameraController(deps: CameraControllerDeps) {
       recordBtn.classList.remove('ready', 'recording');
       viewModeBtn.style.display = 'none';
       recIndicator.style.display = 'none';
-      if (wasRecording) onAnalysisReady([...cameraFrames], selectedView);
+      if (wasRecording) {
+        onAnalysisReady([...cameraFrames], selectedView);
+      } else {
+        if (recordedBlobUrl) {
+          URL.revokeObjectURL(recordedBlobUrl);
+          recordedBlobUrl = null;
+        }
+        video.removeAttribute('src');
+        video.load();
+        shareVideoBtn.style.display = 'none';
+      }
     },
   };
 }

@@ -220,12 +220,12 @@ async function main() {
   const cameraController = initCameraController({
     video,
     overlay,
+    overlayCanvas: canvas,
     landmarker,
     liveMetricsEl,
     setupOverlayEl,
     setupPanelEl,
     videoContainerEl,
-    videoTopRightEl,
     recordBtn,
     viewModeBtn,
     recIndicator,
@@ -234,7 +234,14 @@ async function main() {
     setupToggleEl,
     setupToggleIcon: document.getElementById('setup-toggle-icon') as HTMLElement,
     onAnalysisReady: (frames, view) => { manualView = null; runAnalysis(frames, view); },
-    onBlobUrl: (url) => { if (!url) showIdleUI(); },
+    onRecordingComplete: (blobUrl) => {
+      if (blobUrl) {
+        showVideoFileUI();
+        switchTab('results');
+      } else {
+        showIdleUI();
+      }
+    },
     getLastResults: () => lastResults,
     updateLiveMetrics,
   });
