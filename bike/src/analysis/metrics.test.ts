@@ -16,11 +16,11 @@ function makeFrame(overrides: Partial<Record<number, ReturnType<typeof lm>>> = {
   for (const [idx, val] of Object.entries(overrides)) {
     base[Number(idx)] = val!;
   }
-  return { timestamp: 0, landmarks: base as any, worldLandmarks: base as any };
+  return { timestamp: 0, landmarks: base, worldLandmarks: base };
 }
 
 describe('calculateRearMetrics — hipRock', () => {
-  it('returns null when fewer than 2 valid frames', () => {
+  it('returns null when fewer than 2 frames have valid bilateral hip landmarks', () => {
     const frames = [makeFrame()];
     const result = calculateRearMetrics(frames, []);
     expect(result.hipRock).toBeNull();
@@ -70,8 +70,7 @@ describe('calculateFrontMetrics — kneeSymmetry', () => {
     ];
     const frames = [frame];
     const result = calculateFrontMetrics(frames, events);
-    if (result.kneeSymmetry) {
-      expect(result.kneeSymmetry.value).toBeLessThan(2);
-    }
+    expect(result.kneeSymmetry).not.toBeNull();
+    expect(result.kneeSymmetry!.value).toBeCloseTo(0, 5);
   });
 });

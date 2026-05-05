@@ -18,7 +18,7 @@ function makeFrame(
   wlms[L.RIGHT_HIP]   = { x: 0,                       y: 0,                        z: 0, visibility: 1 };
   wlms[L.RIGHT_KNEE]  = { x: 0,                       y: 1,                        z: 0, visibility: 1 };
   wlms[L.RIGHT_ANKLE] = { x: Math.sin(Math.PI - rad), y: 1 + Math.cos(Math.PI - rad), z: 0, visibility: 1 };
-  return { timestamp, landmarks: lms as any, worldLandmarks: wlms as any };
+  return { timestamp, landmarks: lms, worldLandmarks: wlms };
 }
 
 describe('detectPedalEvents', () => {
@@ -27,7 +27,7 @@ describe('detectPedalEvents', () => {
     const frames = angles.map((a, i) => makeFrame(a, i * 33));
     const events = detectPedalEvents(frames, 30);
     const bdcs = events.filter((e) => e.phase === 'bdc');
-    expect(bdcs.length).toBeGreaterThanOrEqual(1);
+    expect(bdcs.length).toBeGreaterThanOrEqual(2);
   });
 
   it('detects TDC events at knee angle troughs', () => {
@@ -35,7 +35,7 @@ describe('detectPedalEvents', () => {
     const frames = angles.map((a, i) => makeFrame(a, i * 33));
     const events = detectPedalEvents(frames, 30);
     const tdcs = events.filter((e) => e.phase === 'tdc');
-    expect(tdcs.length).toBeGreaterThanOrEqual(1);
+    expect(tdcs.length).toBeGreaterThanOrEqual(2);
   });
 
   it('returns empty array for flat (no movement) frames', () => {
@@ -60,6 +60,19 @@ describe('calculateCadence', () => {
   it('returns 0 for zero duration', () => {
     expect(calculateCadence([], 0)).toBe(0);
   });
+
+  it('ignores non-BDC events when computing rpm', () => {
+    const events = [
+      { phase: 'bdc' as const, side: 'left'  as const, frameIndex: 0,  timestamp: 0    },
+      { phase: 'tdc' as const, side: 'left'  as const, frameIndex: 15, timestamp: 500  },
+      { phase: 'bdc' as const, side: 'right' as const, frameIndex: 30, timestamp: 1000 },
+      { phase: 'tdc' as const, side: 'right' as const, frameIndex: 45, timestamp: 1500 },
+      { phase: 'bdc' as const, side: 'left'  as const, frameIndex: 60, timestamp: 2000 },
+      { phase: 'bdc' as const, side: 'right' as const, frameIndex: 90, timestamp: 3000 },
+    ];
+    // 4 BDC events / 2 sides = 2 revolutions / 2s = 60 rpm
+    expect(calculateCadence(events, 2)).toBe(60);
+  });
 });
 
 describe('segmentPedalCycles', () => {
@@ -72,5 +85,7 @@ describe('segmentPedalCycles', () => {
     expect(cycles).toHaveLength(1);
     expect(cycles[0].startFrame).toBe(0);
     expect(cycles[0].endFrame).toBe(30);
+    expect(cycles[0].side).toBe('left');
+    expect(cycles[0].bdcFrame).toBe(0);
   });
 });

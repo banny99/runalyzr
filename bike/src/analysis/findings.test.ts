@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateRearFindings, generateSagittalFindings } from './findings';
-import type { RearMetrics, SagittalMetrics } from './types';
+import { generateRearFindings, generateSagittalFindings, generateFrontFindings } from './findings';
+import type { RearMetrics, SagittalMetrics, FrontMetrics } from './types';
 
 function makeRearMetrics(overrides: Partial<RearMetrics> = {}): RearMetrics {
   return {
@@ -44,6 +44,13 @@ describe('generateRearFindings', () => {
     expect(findings[0].status).toBe('red');
     expect(findings[1].status).toBe('amber');
   });
+
+  it('returns empty when metric has no finding template', () => {
+    const metrics = makeRearMetrics({
+      heelAlignment: { value: 5, status: 'red', unit: ' cm' },
+    });
+    expect(generateRearFindings(metrics)).toHaveLength(0);
+  });
 });
 
 describe('generateSagittalFindings', () => {
@@ -86,5 +93,33 @@ describe('generateSagittalFindings', () => {
     const findings = generateSagittalFindings(metrics);
     expect(findings[0].status).toBe('red');
     expect(findings[1].status).toBe('amber');
+  });
+});
+
+describe('generateFrontFindings', () => {
+  function makeFrontMetrics(overrides: Partial<FrontMetrics> = {}): FrontMetrics {
+    return {
+      kneeSymmetry:       null,
+      elbowWidthSymmetry: null,
+      shoulderLevel:      null,
+      lateralTrunkLean:   null,
+      headNeckPosition:   null,
+      ...overrides,
+    };
+  }
+
+  it('returns empty array when all metrics are null', () => {
+    expect(generateFrontFindings(makeFrontMetrics())).toHaveLength(0);
+  });
+
+  it('generates a finding for a red kneeSymmetry metric', () => {
+    const metrics = makeFrontMetrics({
+      kneeSymmetry: { value: 3.5, status: 'red', unit: ' cm' },
+    });
+    const findings = generateFrontFindings(metrics);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].metric).toBe('kneeSymmetry');
+    expect(findings[0].status).toBe('red');
+    expect(findings[0].text).toContain('3.5');
   });
 });
