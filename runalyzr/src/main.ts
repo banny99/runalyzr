@@ -213,8 +213,10 @@ async function main() {
     reportModalEl.hidden = true;
   }
 
+  let cameraActive = false;
+
   video.addEventListener('loadedmetadata', () => {
-    showVideoFileUI();
+    if (!cameraActive) showVideoFileUI();
   });
 
   const cameraController = initCameraController({
@@ -235,6 +237,7 @@ async function main() {
     setupToggleIcon: document.getElementById('setup-toggle-icon') as HTMLElement,
     onAnalysisReady: (frames, view) => { manualView = null; runAnalysis(frames, view); },
     onRecordingComplete: (blobUrl) => {
+      cameraActive = false;
       if (blobUrl) {
         showVideoFileUI();
         switchTab('results');
@@ -247,6 +250,7 @@ async function main() {
   });
 
   cameraOpenBtn.addEventListener('click', () => {
+    cameraActive = true;
     loop.stop();
     showCameraUI();
     cameraController.open().catch(console.error);

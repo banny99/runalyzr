@@ -67,7 +67,8 @@ export function findLocalMaxima(
     if (indices.length > 0 && i - indices[indices.length - 1] < minDistance) continue;
     const windowStart = Math.max(0, i - minDistance);
     const windowEnd = Math.min(values.length - 1, i + minDistance);
-    const windowMin = Math.min(...values.slice(windowStart, windowEnd + 1));
+    const windowMin = values.slice(windowStart, windowEnd + 1)
+      .reduce((min, v) => (v < min ? v : min), values[i]);
     if (values[i] - windowMin >= minProminence) indices.push(i);
   }
   return indices;

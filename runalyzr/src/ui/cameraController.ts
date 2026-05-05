@@ -390,7 +390,6 @@ export function initCameraController(deps: CameraControllerDeps) {
           recordedBlobUrl = null;
         }
         video.removeAttribute('src');
-        video.load();
         shareVideoBtn.style.display = 'none';
       }
     },
