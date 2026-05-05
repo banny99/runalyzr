@@ -447,6 +447,10 @@ async function main() {
       cameraState = 'closed';
       rideRecordBtn.classList.remove('recording');
       rideRecordBtn.textContent = '⏺';
+      if (recordingLockTimeout) {
+        clearTimeout(recordingLockTimeout);
+        recordingLockTimeout = null;
+      }
       rideRecordBtn.disabled = false;
       if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
       mediaRecorder = null;
