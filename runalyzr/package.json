@@ -12,7 +12,7 @@
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.14",
     "@runalyzr/shared": "*",
-    "jspdf": "^2.5.1"
+    "jspdf": "^4.2.1"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

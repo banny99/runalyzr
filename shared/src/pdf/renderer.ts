@@ -117,7 +117,7 @@ export function generateReport(sections: ReportSection[], meta: ReportMeta): voi
   }
 
   // Footer on every page
-  const pageCount = (doc as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+  const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7);
