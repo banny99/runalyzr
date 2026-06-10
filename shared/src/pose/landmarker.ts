@@ -3,7 +3,26 @@ import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import type { LandmarkArray } from '../types/index';
 
 /** Superset of mediapipe's RunningMode — includes LIVE_STREAM which the package typedefs omit. */
-type RunningMode = 'VIDEO' | 'IMAGE' | 'LIVE_STREAM';
+export type RunningMode = 'VIDEO' | 'IMAGE' | 'LIVE_STREAM';
+
+/** The slice of PoseLandmarker that mode switching needs — keeps tests stub-friendly. */
+export type ModeSwitchable = Pick<PoseLandmarker, 'setOptions'>;
+
+const currentModes = new WeakMap<ModeSwitchable, RunningMode>();
+
+/**
+ * Switch a landmarker's running mode, skipping the (expensive) graph rebuild
+ * when the mode is already current. detect() requires IMAGE mode while
+ * detectForVideo() requires VIDEO mode — call this before switching API styles.
+ */
+export async function setRunningMode(
+  landmarker: ModeSwitchable,
+  mode: RunningMode,
+): Promise<void> {
+  if (currentModes.get(landmarker) === mode) return;
+  await landmarker.setOptions({ runningMode: mode as 'VIDEO' | 'IMAGE' });
+  currentModes.set(landmarker, mode);
+}
 
 async function buildLandmarker(
   vision: Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>,
@@ -39,9 +58,12 @@ export async function initLandmarker(
   onResult?: (landmarks: LandmarkArray, timestamp: number) => void,
 ): Promise<PoseLandmarker> {
   const vision = await FilesetResolver.forVisionTasks(wasmPath);
+  let landmarker: PoseLandmarker;
   try {
-    return await buildLandmarker(vision, modelUrl, mode, 'GPU', onResult);
+    landmarker = await buildLandmarker(vision, modelUrl, mode, 'GPU', onResult);
   } catch {
-    return buildLandmarker(vision, modelUrl, mode, 'CPU', onResult);
+    landmarker = await buildLandmarker(vision, modelUrl, mode, 'CPU', onResult);
   }
+  currentModes.set(landmarker, mode);
+  return landmarker;
 }

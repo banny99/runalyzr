@@ -185,8 +185,20 @@ export function initFitGuide(
   function processPhoto(file: File) {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
-      const result = analyzeImage(landmarker, img);
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('Could not load this image. Please try a different photo.');
+    };
+    img.onload = async () => {
+      let result: Awaited<ReturnType<typeof analyzeImage>>;
+      try {
+        result = await analyzeImage(landmarker, img);
+      } catch (e) {
+        console.error('Photo analysis failed:', e);
+        URL.revokeObjectURL(url);
+        alert('Photo analysis failed. Please try again.');
+        return;
+      }
       if (!result) {
         alert('No pose detected in this photo. Please retake.');
         URL.revokeObjectURL(url);
@@ -203,7 +215,7 @@ export function initFitGuide(
       const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
       URL.revokeObjectURL(url);
 
-      const measurements = measureFitPosition(pos.id, result.landmarks);
+      const measurements = measureFitPosition(pos.id, result.worldLandmarks);
 
       const fitResult: FitPositionResult = {
         positionId:    pos.id,

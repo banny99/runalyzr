@@ -1,5 +1,5 @@
 import type { FrameData } from '@runalyzr/shared/types';
-import { angleBetweenThreePoints, midpoint, verticalDisplacement } from '@runalyzr/shared/math';
+import { angleBetweenThreePoints, midpoint } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../../config/defaults';
 import type { PedalEvent, PedalCycle, SagittalMetrics } from '../types';
 import { makeMetricResult } from '../thresholds';
@@ -58,7 +58,9 @@ export function calculateSagittalMetrics(
   const rightHip = hipAngleAt(frames, events, 'tdc', 'right');
   const avgHip   = leftHip !== null && rightHip !== null ? (leftHip + rightHip) / 2 : (leftHip ?? rightHip);
 
-  // Hip vertical oscillation (image landmarks — world y is always ~0 at hip centre)
+  // Hip vertical oscillation (image landmarks — world y is always ~0 at hip
+  // centre, so whole-body bobbing only shows in image coords). Reported as
+  // % of frame height; honest cm would need a calibration reference.
   const hipOscillation = (() => {
     const hipMidYs = frames.map((f) => {
       const lh = f.landmarks[L.LEFT_HIP];
@@ -140,11 +142,22 @@ export function calculateSagittalMetrics(
     return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : null;
   })();
 
-  // Ankle ankling pattern — range of motion across stroke
+  // Ankle ankling pattern — vertical range of foot motion across the stroke.
+  // Foot moves relative to the hip-centred world origin, so world coords give
+  // a real range in metres (× 100 → cm).
   const ankleAnkling = (() => {
-    const leftRange  = verticalDisplacement(L.LEFT_FOOT_INDEX, frames);
-    const rightRange = verticalDisplacement(L.RIGHT_FOOT_INDEX, frames);
-    const avg = (leftRange + rightRange) / 2;
+    const worldYRange = (idx: number): number => {
+      const ys: number[] = [];
+      for (const f of frames) {
+        const y = f.worldLandmarks[idx]?.y;
+        if (y !== undefined) ys.push(y);
+      }
+      if (ys.length < 2) return 0;
+      let lo = ys[0], hi = ys[0];
+      for (const y of ys) { if (y < lo) lo = y; if (y > hi) hi = y; }
+      return (hi - lo) * 100;
+    };
+    const avg = (worldYRange(L.LEFT_FOOT_INDEX) + worldYRange(L.RIGHT_FOOT_INDEX)) / 2;
     return avg > 0 ? avg : null;
   })();
 

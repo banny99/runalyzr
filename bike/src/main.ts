@@ -1,5 +1,5 @@
 import './ui/styles.css';
-import { initLandmarker } from '@runalyzr/shared/pose';
+import { initLandmarker, setRunningMode } from '@runalyzr/shared/pose';
 import { MEDIAPIPE_CDN, HEAVY_MODEL_URL } from './config/defaults';
 import { createProcessingLoop } from './pose/processing';
 import { initOverlay } from './ui/overlay';
@@ -31,6 +31,12 @@ async function main() {
         (t as HTMLElement).classList.toggle('active', (t as HTMLElement).dataset.mode === mode));
       fitModeEl.classList.toggle('active', mode === 'fit');
       rideModeEl.classList.toggle('active', mode === 'ride');
+      if (mode === 'fit') {
+        // Stop ride video/camera so detectForVideo isn't running when the
+        // fit guide switches the shared landmarker to IMAGE mode.
+        rideVideo.pause();
+        if (!rideCameraCloseBtn.hidden) rideCameraCloseBtn.click();
+      }
       document.querySelectorAll('.tab').forEach((t) =>
         (t as HTMLElement).classList.toggle('active', (t as HTMLElement).dataset.tab === 'camera'));
       document.querySelectorAll('.tab-panel').forEach((p) =>
@@ -320,8 +326,6 @@ async function main() {
     let cameraRunning = false;
     let cameraRafId = 0;
     const cameraFrames: FrameData[] = [];
-    let mediaRecorder: MediaRecorder | null = null;
-    const recordedChunks: Blob[] = [];
     let recordingLockTimeout: ReturnType<typeof window.setTimeout> | null = null;
 
     function resetRideVideo() {
@@ -338,8 +342,6 @@ async function main() {
         setupBuffer.length = 0;
         cameraState = 'closed';
       }
-      if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
-      mediaRecorder = null;
       cameraFrames.length = 0;
       rideVideo.removeAttribute('src');
       rideVideo.load();
@@ -370,6 +372,9 @@ async function main() {
         setupPanelEl.classList.add('open');
         overlay.syncSize();
         rideVideo.addEventListener('resize', () => overlay.syncSize(), { once: true });
+
+        // The fit guide may have left the landmarker in IMAGE mode.
+        await setRunningMode(landmarker, 'VIDEO');
 
         (function cameraLoop() {
           if (!cameraRunning) return;
@@ -423,7 +428,6 @@ async function main() {
       if (cameraState !== 'recording') {
         cameraState = 'recording';
         cameraFrames.length = 0;
-        recordedChunks.length = 0;
         rideRecordBtn.classList.add('recording');
         rideRecordBtn.textContent = '⏹';
 
@@ -433,17 +437,6 @@ async function main() {
           recordingLockTimeout = null;
           rideRecordBtn.disabled = false;
         }, 5000);
-
-        if (typeof MediaRecorder !== 'undefined' && rideVideo.srcObject) {
-          const mimeType = ['video/webm;codecs=vp9', 'video/webm']
-            .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
-          try {
-            mediaRecorder = new MediaRecorder(rideVideo.srcObject as MediaStream,
-              mimeType ? { mimeType } : {});
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.start(100);
-          } catch { mediaRecorder = null; }
-        }
       } else {
         cameraState = 'closed';
         rideRecordBtn.classList.remove('recording');
@@ -453,8 +446,6 @@ async function main() {
           recordingLockTimeout = null;
         }
         rideRecordBtn.disabled = false;
-        if (mediaRecorder?.state !== 'inactive') mediaRecorder?.stop();
-        mediaRecorder = null;
         runRideAnalysis([...cameraFrames]);
       }
     });
@@ -469,11 +460,16 @@ async function main() {
   // ── PDF generation ──────────────────────────────────────────────────
   generatePdfBtn.addEventListener('click', async () => {
     const { generateBikeReport } = await import('./report/pdfGenerator');
+    // Mid-session exports happen before onComplete fires, so fall back to the
+    // guide's live results when no finished session has been stored yet.
+    const liveFitResults = fitGuide.getResults();
+    const fitResults = lastFitResults
+      ?? (liveFitResults.positions.length > 0 ? liveFitResults : null);
     generateBikeReport({
       clientName: clientNameInput.value,
       notes: sessionNotesEl.value,
       rideResults: lastRideResults,
-      fitResults: lastFitResults,
+      fitResults,
       enabledMetrics,
     });
     closeReportModal();

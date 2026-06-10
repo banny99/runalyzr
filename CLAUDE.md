@@ -23,13 +23,15 @@ cd runalyzr && npm test           # 31 Vitest tests
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 22 Vitest tests
+cd bike && npm test               # 34 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 ```
 
 ## Module Resolution
 
-Both apps use `moduleResolution: bundler`. `@runalyzr/shared/*` is resolved via **tsconfig `paths` + Vite `alias`** — not Node resolution. The `shared/package.json` exports (`.js` paths) only affect non-Vite consumers.
+Both apps use `moduleResolution: bundler`. `@runalyzr/shared/*` is resolved via **tsconfig `paths` + Vite `alias`** — not Node resolution. The `shared/package.json` exports (`.ts` paths) only affect non-Vite consumers.
+
+Both tsconfigs set `"noEmit": true`. Never let `tsc` emit `.js` into `src/` — Vite resolves `.js` before `.ts`, so stale emitted files silently shadow TypeScript sources in the dev server.
 
 Shared subpaths:
 - `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`
@@ -106,8 +108,12 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | File | Tests | What's covered |
 |------|-------|----------------|
 | `runalyzr/src/analysis/*.test.ts` | 31 | Gait detection, metrics, thresholds, setup checks |
-| `bike/src/analysis/pedalDetection.test.ts` | 6 | BDC/TDC detection, cadence, cycle segmentation |
-| `bike/src/analysis/metrics.test.ts` | 8 | hipRock, kneeSymmetry |
-| `bike/src/analysis/findings.test.ts` | 8 | generateRear/Sagittal/FrontFindings |
+| `bike/src/analysis/pedalDetection.test.ts` | 7 | BDC/TDC detection, cadence, cycle segmentation |
+| `bike/src/analysis/metrics.test.ts` | 5 | hipRock, kneeSymmetry |
+| `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
+| `bike/src/analysis/fitMetrics.test.ts` | 8 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) |
+| `bike/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup |
+
+All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
 
 No UI tests — verify camera and recording flows manually in the browser.

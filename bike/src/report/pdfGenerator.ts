@@ -36,28 +36,13 @@ export function generateBikeReport(params: BikeReportParams): void {
   if (params.rideResults) {
     const { sagittal, rear, front } = params.rideResults;
     if (sagittal) {
-      sections.push(buildSection(
-        'Sagittal (Side) View',
-        sagittal as unknown as Record<string, MetricResult | null>,
-        [],
-        params.enabledMetrics,
-      ));
+      sections.push(buildSection('Sagittal (Side) View', sagittal, [], params.enabledMetrics));
     }
     if (rear) {
-      sections.push(buildSection(
-        'Rear View',
-        rear as unknown as Record<string, MetricResult | null>,
-        [],
-        params.enabledMetrics,
-      ));
+      sections.push(buildSection('Rear View', rear, [], params.enabledMetrics));
     }
     if (front) {
-      sections.push(buildSection(
-        'Front View',
-        front as unknown as Record<string, MetricResult | null>,
-        [],
-        params.enabledMetrics,
-      ));
+      sections.push(buildSection('Front View', front, [], params.enabledMetrics));
     }
   }
 

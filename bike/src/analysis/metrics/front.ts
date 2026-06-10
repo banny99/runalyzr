@@ -10,42 +10,53 @@ export function calculateFrontMetrics(
   frames: FrameData[],
   events: PedalEvent[],
 ): FrontMetrics {
-  // Knee symmetry L/R — at BDC, difference in lateral knee position
+  // Knee symmetry L/R — at BDC, each knee's lateral offset angle from the
+  // vertical line through its hip; symmetric riders show matching angles.
   const kneeSymmetry = (() => {
-    const bdcLeft  = events.filter((e) => e.phase === 'bdc' && e.side === 'left');
-    const bdcRight = events.filter((e) => e.phase === 'bdc' && e.side === 'right');
-    if (bdcLeft.length === 0 || bdcRight.length === 0) return null;
-    const leftX  = bdcLeft.map((e)  => frames[e.frameIndex]?.landmarks[L.LEFT_KNEE]?.x  ?? 0).filter(Boolean);
-    const rightX = bdcRight.map((e) => frames[e.frameIndex]?.landmarks[L.RIGHT_KNEE]?.x ?? 0).filter(Boolean);
-    const avgL = leftX.reduce((a, b)  => a + b, 0) / leftX.length;
-    const avgR = rightX.reduce((a, b) => a + b, 0) / rightX.length;
-    // Symmetric if left and right are equidistant from midline (0.5)
-    const lDev = Math.abs(avgL - 0.5);
-    const rDev = Math.abs(avgR - 0.5);
-    return Math.abs(lDev - rDev) * 100;
+    const offsetAngle = (frameIndex: number, side: 'left' | 'right'): number | null => {
+      const f = frames[frameIndex];
+      const knee = f?.worldLandmarks[side === 'left' ? L.LEFT_KNEE : L.RIGHT_KNEE];
+      const hip  = f?.worldLandmarks[side === 'left' ? L.LEFT_HIP  : L.RIGHT_HIP];
+      if (!knee || !hip) return null;
+      return (Math.atan2(Math.abs(knee.x - hip.x), Math.abs(knee.y - hip.y)) * 180) / Math.PI;
+    };
+    const leftAngles = events.filter((e) => e.phase === 'bdc' && e.side === 'left')
+      .map((e) => offsetAngle(e.frameIndex, 'left'))
+      .filter((v): v is number => v !== null);
+    const rightAngles = events.filter((e) => e.phase === 'bdc' && e.side === 'right')
+      .map((e) => offsetAngle(e.frameIndex, 'right'))
+      .filter((v): v is number => v !== null);
+    if (leftAngles.length === 0 || rightAngles.length === 0) return null;
+    const avgL = leftAngles.reduce((a, b)  => a + b, 0) / leftAngles.length;
+    const avgR = rightAngles.reduce((a, b) => a + b, 0) / rightAngles.length;
+    return Math.abs(avgL - avgR);
   })();
 
-  // Elbow width symmetry — left-right elbow distance from midline
+  // Elbow width symmetry — each elbow's outward angle from the vertical line
+  // through its shoulder; symmetric arm positions show matching angles.
   const elbowWidthSymmetry = (() => {
     const diffs = frames.map((f) => {
-      const le = f.landmarks[L.LEFT_ELBOW];
-      const re = f.landmarks[L.RIGHT_ELBOW];
-      if (!le || !re) return null;
-      const mid = (le.x + re.x) / 2;
-      return Math.abs(Math.abs(le.x - mid) - Math.abs(re.x - mid)) * 100;
+      const le = f.worldLandmarks[L.LEFT_ELBOW];
+      const re = f.worldLandmarks[L.RIGHT_ELBOW];
+      const ls = f.worldLandmarks[L.LEFT_SHOULDER];
+      const rs = f.worldLandmarks[L.RIGHT_SHOULDER];
+      if (!le || !re || !ls || !rs) return null;
+      const aL = (Math.atan2(Math.abs(le.x - ls.x), Math.abs(le.y - ls.y)) * 180) / Math.PI;
+      const aR = (Math.atan2(Math.abs(re.x - rs.x), Math.abs(re.y - rs.y)) * 180) / Math.PI;
+      return Math.abs(aL - aR);
     }).filter((v): v is number => v !== null);
     return diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null;
   })();
 
-  // Shoulder level — height asymmetry
+  // Shoulder level — tilt of the shoulder line away from horizontal
   const shoulderLevel = (() => {
-    const diffs = frames.map((f) => {
+    const tilts = frames.map((f) => {
       const ls = f.worldLandmarks[L.LEFT_SHOULDER];
       const rs = f.worldLandmarks[L.RIGHT_SHOULDER];
       if (!ls || !rs) return null;
-      return Math.abs(ls.y - rs.y) * 100;
+      return (Math.atan2(Math.abs(ls.y - rs.y), Math.abs(ls.x - rs.x)) * 180) / Math.PI;
     }).filter((v): v is number => v !== null);
-    return diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null;
+    return tilts.length > 0 ? tilts.reduce((a, b) => a + b, 0) / tilts.length : null;
   })();
 
   // Lateral trunk lean — angle of shoulder midpoint to hip midpoint from vertical

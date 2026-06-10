@@ -57,12 +57,16 @@ describe('calculateFrontMetrics — kneeSymmetry', () => {
     expect(result.kneeSymmetry).toBeNull();
   });
 
-  it('reports near-zero asymmetry when knees are equidistant from midline', () => {
-    // left knee at 0.45 (lDev=0.05), right knee at 0.55 (rDev=0.05)
-    // symmetry = |0.05 - 0.05| * 100 = 0
+  it('reports near-zero asymmetry when knees track their hips symmetrically', () => {
+    // Each knee's lateral offset angle from the vertical through its hip:
+    // left  = atan2(|-0.15 - -0.1|, |0.4 - 0|) = atan2(0.05, 0.4)
+    // right = atan2(| 0.15 -  0.1|, |0.4 - 0|) = atan2(0.05, 0.4)
+    // symmetry = |left - right| = 0
     const frame = makeFrame({
-      [L.LEFT_KNEE]:  lm(0.45, 0.6),
-      [L.RIGHT_KNEE]: lm(0.55, 0.6),
+      [L.LEFT_HIP]:   lm(-0.1, 0),
+      [L.RIGHT_HIP]:  lm(0.1, 0),
+      [L.LEFT_KNEE]:  lm(-0.15, 0.4),
+      [L.RIGHT_KNEE]: lm(0.15, 0.4),
     });
     const events: PedalEvent[] = [
       { phase: 'bdc', side: 'left',  frameIndex: 0, timestamp: 0 },

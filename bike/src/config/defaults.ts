@@ -133,7 +133,7 @@ export const METRIC_LABELS: Record<string, string> = {
   hipRock:                 'Hip Rock (Lateral Sway)',
   pelvicObliquity:         'Pelvic Obliquity',
   kneeVarusValgus:         'Knee Varus / Valgus',
-  heelAlignment:           'Heel Alignment at BDC',
+  heelAlignment:           'Foot Rotation at BDC',
   // Front
   kneeSymmetry:            'Knee Symmetry L/R',
   elbowWidthSymmetry:      'Elbow Width Symmetry',

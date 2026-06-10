@@ -23,8 +23,8 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
     amber: 'Hip angle at TDC is {value}° — hip is slightly restricted at top of stroke.',
   },
   hipVerticalOscillation: {
-    red:   'Hip vertical oscillation of {value} cm is excessive, indicating significant saddle height issues or poor technique.',
-    amber: 'Hip vertical oscillation of {value} cm is slightly elevated.',
+    red:   'Hip vertical oscillation of {value}% of frame height is excessive, indicating significant saddle height issues or poor technique.',
+    amber: 'Hip vertical oscillation of {value}% of frame height is slightly elevated.',
   },
   torsoAngle: {
     red:   'Torso angle of {value}° is outside optimal range. Review handlebar height and stem length.',
@@ -43,24 +43,24 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
     amber: 'Cadence of {value} rpm is slightly low.',
   },
   hipRock: {
-    red:   'Hip rock of {value} cm per stroke is excessive. Check saddle height, saddle tilt, and cleat float.',
-    amber: 'Hip rock of {value} cm per stroke is slightly elevated.',
+    red:   'Hip rock of {value}% of frame width per stroke is excessive. Check saddle height, saddle tilt, and cleat float.',
+    amber: 'Hip rock of {value}% of frame width per stroke is slightly elevated.',
   },
   pelvicObliquity: {
-    red:   'Pelvic obliquity of {value} cm indicates significant L/R asymmetry. Check leg length discrepancy and cleat position.',
-    amber: 'Mild pelvic obliquity of {value} cm detected.',
+    red:   'Pelvic obliquity of {value}° indicates significant L/R asymmetry. Check leg length discrepancy and cleat position.',
+    amber: 'Mild pelvic obliquity of {value}° detected.',
   },
   kneeVarusValgus: {
-    red:   'Knee varus/valgus deviation of {value} cm at BDC is significant. Review cleat alignment and q-factor.',
-    amber: 'Mild knee varus/valgus deviation of {value} cm detected.',
+    red:   'Knee varus/valgus deviation of {value}° at BDC is significant. Review cleat alignment and q-factor.',
+    amber: 'Mild knee varus/valgus deviation of {value}° detected.',
   },
   kneeSymmetry: {
-    red:   'Knee lateral asymmetry of {value} cm L vs R — check cleat position and saddle tilt.',
-    amber: 'Mild knee lateral asymmetry of {value} cm detected.',
+    red:   'Knee tracking asymmetry of {value}° L vs R — check cleat position and saddle tilt.',
+    amber: 'Mild knee tracking asymmetry of {value}° detected.',
   },
   shoulderLevel: {
-    red:   'Shoulder drop of {value} cm indicates lateral asymmetry — check saddle tilt and cleat wedges.',
-    amber: 'Mild shoulder drop of {value} cm detected.',
+    red:   'Shoulder tilt of {value}° indicates lateral asymmetry — check saddle tilt and cleat wedges.',
+    amber: 'Mild shoulder tilt of {value}° detected.',
   },
   lateralTrunkLean: {
     red:   'Lateral trunk lean of {value}° is excessive — may indicate leg length discrepancy or hip weakness.',
