@@ -28,9 +28,9 @@ export function renderRideDashboard(
   findingsEl.innerHTML = '';
 
   const sections: ViewSection[] = [];
-  if (sagittal) sections.push({ title: 'Sagittal (Side) View', metrics: sagittal as unknown as Record<string, MetricResult | null>, findings: sagittalFindings });
-  if (rear)     sections.push({ title: 'Rear View',            metrics: rear     as unknown as Record<string, MetricResult | null>, findings: rearFindings });
-  if (front)    sections.push({ title: 'Front View',           metrics: front    as unknown as Record<string, MetricResult | null>, findings: frontFindings });
+  if (sagittal) sections.push({ title: 'Sagittal (Side) View', metrics: sagittal, findings: sagittalFindings });
+  if (rear)     sections.push({ title: 'Rear View',            metrics: rear,     findings: rearFindings });
+  if (front)    sections.push({ title: 'Front View',           metrics: front,    findings: frontFindings });
 
   if (sections.length === 0) return;
 

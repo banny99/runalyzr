@@ -9,7 +9,9 @@ export function calculateRearMetrics(
   frames: FrameData[],
   events: PedalEvent[],
 ): RearMetrics {
-  // Hip rock — lateral hip displacement peak-to-peak
+  // Hip rock — lateral hip displacement peak-to-peak. Whole-body motion can't
+  // be measured in world coords (origin travels with the hips), so this stays
+  // in normalized image coords and is reported as % of frame width.
   const hipRock = (() => {
     const hipXs = frames.map((f) => {
       const lh = f.landmarks[L.LEFT_HIP];
@@ -23,18 +25,20 @@ export function calculateRearMetrics(
     return (hi - lo) * 100;
   })();
 
-  // Pelvic obliquity — average absolute left-right hip height asymmetry
+  // Pelvic obliquity — average tilt of the hip line away from horizontal
   const pelvicObliquity = (() => {
-    const diffs = frames.map((f) => {
+    const tilts = frames.map((f) => {
       const lh = f.worldLandmarks[L.LEFT_HIP];
       const rh = f.worldLandmarks[L.RIGHT_HIP];
       if (!lh || !rh) return null;
-      return Math.abs(lh.y - rh.y) * 100;
+      return (Math.atan2(Math.abs(lh.y - rh.y), Math.abs(lh.x - rh.x)) * 180) / Math.PI;
     }).filter((v): v is number => v !== null);
-    return diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null;
+    return tilts.length > 0 ? tilts.reduce((a, b) => a + b, 0) / tilts.length : null;
   })();
 
-  // Knee varus/valgus — at BDC, measure knee lateral deviation relative to hip-foot line
+  // Knee varus/valgus — at BDC, frontal-plane (x–y) angle between the
+  // hip→knee and hip→ankle directions. 0° = knee tracks the hip–ankle line;
+  // flexion lives in the depth axis so it doesn't pollute this.
   const kneeVarusValgus = (() => {
     const bdcEvents = events.filter((e) => e.phase === 'bdc');
     if (bdcEvents.length === 0) return null;
@@ -45,31 +49,35 @@ export function calculateRearMetrics(
       const hipIdx   = side === 'left' ? L.LEFT_HIP   : L.RIGHT_HIP;
       const kneeIdx  = side === 'left' ? L.LEFT_KNEE  : L.RIGHT_KNEE;
       const ankleIdx = side === 'left' ? L.LEFT_ANKLE : L.RIGHT_ANKLE;
-      const hip   = f.landmarks[hipIdx];
-      const knee  = f.landmarks[kneeIdx];
-      const ankle = f.landmarks[ankleIdx];
+      const hip   = f.worldLandmarks[hipIdx];
+      const knee  = f.worldLandmarks[kneeIdx];
+      const ankle = f.worldLandmarks[ankleIdx];
       if (!hip || !knee || !ankle) return null;
-      // Lateral deviation: knee x vs expected line from hip to ankle
-      const expectedKneeX = hip.x + (ankle.x - hip.x) * ((knee.y - hip.y) / (ankle.y - hip.y));
-      return Math.abs(knee.x - expectedKneeX) * 100;
+      const a1 = Math.atan2(knee.x - hip.x, knee.y - hip.y);
+      const a2 = Math.atan2(ankle.x - hip.x, ankle.y - hip.y);
+      let d = (Math.abs(a1 - a2) * 180) / Math.PI;
+      if (d > 180) d = 360 - d;
+      return d;
     }).filter((v): v is number => v !== null);
     return deviations.length > 0 ? deviations.reduce((a, b) => a + b, 0) / deviations.length : null;
   })();
 
-  // Heel alignment at BDC — how much the heel deviates laterally from ankle
+  // Foot rotation at BDC — toe-in/toe-out angle of the heel→toe axis against
+  // the depth (z) axis in the horizontal plane. This is what cleat rotation
+  // actually changes; the old heel-vs-ankle lateral offset barely measured it.
   const heelAlignment = (() => {
     const bdcEvents = events.filter((e) => e.phase === 'bdc');
     if (bdcEvents.length === 0) return null;
     const devs = bdcEvents.map((e) => {
       const f = frames[e.frameIndex];
       if (!f) return null;
-      const side     = e.side;
-      const ankleIdx = side === 'left' ? L.LEFT_ANKLE : L.RIGHT_ANKLE;
-      const heelIdx  = side === 'left' ? L.LEFT_HEEL  : L.RIGHT_HEEL;
-      const ankle    = f.landmarks[ankleIdx];
-      const heel     = f.landmarks[heelIdx];
-      if (!ankle || !heel) return null;
-      return Math.abs(heel.x - ankle.x) * 100;
+      const side    = e.side;
+      const heelIdx = side === 'left' ? L.LEFT_HEEL       : L.RIGHT_HEEL;
+      const toeIdx  = side === 'left' ? L.LEFT_FOOT_INDEX : L.RIGHT_FOOT_INDEX;
+      const heel    = f.worldLandmarks[heelIdx];
+      const toe     = f.worldLandmarks[toeIdx];
+      if (!heel || !toe) return null;
+      return (Math.atan2(Math.abs(toe.x - heel.x), Math.abs(toe.z - heel.z)) * 180) / Math.PI;
     }).filter((v): v is number => v !== null);
     return devs.length > 0 ? devs.reduce((a, b) => a + b, 0) / devs.length : null;
   })();

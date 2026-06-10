@@ -1,6 +1,7 @@
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 import { FPS_TARGET, FPS_SKIP_THRESHOLD, LANDMARKS } from '../config/defaults';
 import type { FrameData, LandmarkArray, CameraView } from '@runalyzr/shared/types';
+import { setRunningMode } from '@runalyzr/shared/pose';
 
 // requestVideoFrameCallback (Safari 15.4+, Chrome 83+) fires exactly once per
 // decoded video frame — avoids processing duplicate frames.
@@ -24,10 +25,13 @@ export function detectCameraView(landmarks: LandmarkArray): CameraView {
   return 'unknown';
 }
 
-export function analyzeImage(
+export async function analyzeImage(
   landmarker: PoseLandmarker,
   image: HTMLImageElement,
-): { landmarks: LandmarkArray; worldLandmarks: LandmarkArray } | null {
+): Promise<{ landmarks: LandmarkArray; worldLandmarks: LandmarkArray } | null> {
+  // detect() throws unless the task is in IMAGE mode (it is created in VIDEO
+  // mode for ride analysis), so switch before every still-photo detection.
+  await setRunningMode(landmarker, 'IMAGE');
   const result = landmarker.detect(image);
   if (result.landmarks.length === 0) return null;
   return {
@@ -91,11 +95,16 @@ export function createProcessingLoop(
       frames.length = 0;
       currentLandmarks = null;
       lastProcessTime = 0;
-      if (useVFC) {
-        rafId = video.requestVideoFrameCallback!(processFrame);
-      } else {
-        rafId = requestAnimationFrame(processFrame);
-      }
+      // The fit guide may have left the landmarker in IMAGE mode; switch back
+      // before the first detectForVideo call (no-op when already VIDEO).
+      void setRunningMode(landmarker, 'VIDEO').then(() => {
+        if (!running) return;
+        if (useVFC) {
+          rafId = video.requestVideoFrameCallback!(processFrame);
+        } else {
+          rafId = requestAnimationFrame(processFrame);
+        }
+      });
     },
     stop() {
       running = false;
