@@ -1,24 +1,7 @@
 import type { FrameData } from '@runalyzr/shared/types';
-import { angleBetweenThreePoints } from '@runalyzr/shared/math';
+import { angleBetweenThreePoints, findLocalMaxima, findLocalMinima } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../config/defaults';
 import type { PedalEvent, PedalCycle } from './types';
-
-function findLocalMaxima(values: number[], minDistance: number, minProminence: number): number[] {
-  const indices: number[] = [];
-  for (let i = 1; i < values.length - 1; i++) {
-    if (values[i] <= values[i - 1] || values[i] < values[i + 1]) continue;
-    if (indices.length > 0 && i - indices[indices.length - 1] < minDistance) continue;
-    const windowStart = Math.max(0, i - minDistance);
-    const windowEnd = Math.min(values.length - 1, i + minDistance);
-    const windowMin = Math.min(...values.slice(windowStart, windowEnd + 1));
-    if (values[i] - windowMin >= minProminence) indices.push(i);
-  }
-  return indices;
-}
-
-function findLocalMinima(values: number[], minDistance: number, minProminence: number): number[] {
-  return findLocalMaxima(values.map((v) => -v), minDistance, minProminence);
-}
 
 export function detectPedalEvents(frames: FrameData[], fps: number): PedalEvent[] {
   const minFrames = Math.round(fps * 0.2);

@@ -1,0 +1,113 @@
+# Runalyzr Monorepo
+
+TypeScript monorepo: **runalyzr** (run form analysis) and **bike** (bike fitting analysis), sharing utilities via `@runalyzr/shared`.
+
+## Workspaces
+
+| Directory | Package | Role |
+|-----------|---------|------|
+| `shared/` | `@runalyzr/shared` | Math utilities, types, pose landmarker, PDF renderer |
+| `runalyzr/` | — | Run form analysis web app |
+| `bike/` | — | Bike fitting analysis web app |
+
+## Commands
+
+Always `cd` into the workspace first — there is no root-level build or test command.
+
+```bash
+# runalyzr
+cd runalyzr && npm run build      # Vite build
+cd runalyzr && npm run dev        # Dev server
+cd runalyzr && npm test           # 31 Vitest tests
+
+# bike
+cd bike && npm run build          # Vite build
+cd bike && npm run dev            # Dev server
+cd bike && npm test               # 22 Vitest tests
+cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
+```
+
+## Module Resolution
+
+Both apps use `moduleResolution: bundler`. `@runalyzr/shared/*` is resolved via **tsconfig `paths` + Vite `alias`** — not Node resolution. The `shared/package.json` exports (`.js` paths) only affect non-Vite consumers.
+
+Shared subpaths:
+- `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`
+- `@runalyzr/shared/types` → `FrameData`, `LandmarkArray`, `CameraView`
+- `@runalyzr/shared/pose` → MediaPipe pose landmarker wrapper
+- `@runalyzr/shared/pdf` → jsPDF report renderer
+
+## Non-Negotiable Invariants
+
+### No `Math.max/min(...array)` spreads
+Throws `RangeError` on Safari when arrays exceed ~65 K elements. At 30 fps × 9 000 frame cap, landmark arrays hit this. Use explicit loops everywhere:
+```typescript
+let lo = arr[0], hi = arr[0];
+for (const v of arr) { if (v < lo) lo = v; if (v > hi) hi = v; }
+```
+This applies inside `findLocalMaxima` too — use `.reduce()` for the window min, not `Math.min(...slice)`.
+
+### Always revoke Object URLs before creating new ones
+```typescript
+if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+currentObjectUrl = URL.createObjectURL(file);
+```
+Both videoPlayer.ts files follow this pattern.
+
+### No type escape hatches
+Avoid `as any` and `as unknown as T`. Use generic constraints:
+```typescript
+// ✅
+function findingsFromMetricGroup<T extends Record<string, MetricResult | null>>(metrics: T)
+// ❌
+metrics as unknown as Record<string, MetricResult | null>
+```
+
+## Key Architecture
+
+### Analysis pipeline
+```
+Camera / Video → MediaPipe PoseLandmarker → FrameData[]
+  → metrics functions → MetricResult (value + status + unit)
+  → findings (amber/red only) → PDF report
+```
+
+`FrameData = { timestamp: number; landmarks: LandmarkArray; worldLandmarks: LandmarkArray }`
+
+### Pose landmarker (shared)
+`shared/src/pose/landmarker.ts` tries GPU delegate first, falls back to CPU automatically. Callers just `await initLandmarker(modelUrl, wasmPath, mode)` — no GPU handling needed at call sites.
+
+### findLocalMaxima / findLocalMinima (shared)
+Live in `@runalyzr/shared/math` (`shared/src/math/angles.ts`). Do not define them in app-level files — they were extracted from both apps to eliminate duplication.
+
+### runalyzr: CameraController
+`runalyzr/src/ui/cameraController.ts` — deps-injection pattern, returns `{ open(), close() }`.
+
+- All camera state (`cameraState`, `cameraRunning`, frames, mediaRecorder, etc.) is internal to the controller.
+- `main.ts` owns a `cameraActive: boolean` flag that guards the `loadedmetadata` listener — prevents `showVideoFileUI()` firing during camera-originated `video.load()` calls.
+- Recording completion is signalled via the `onRecordingComplete(blobUrl)` callback in `CameraControllerDeps`, not inline DOM manipulation.
+- `initVideoPlayer()` returns a `() => void` keydown cleanup — stored as `cleanupVideoPlayer` for future use when CameraController is torn down.
+
+### runalyzr: Threshold evaluation
+`runalyzr/src/analysis/thresholds.ts`: **green wins at boundary**. Amber bands are half-open:
+- Lower amber: `value >= t.amber[0] && value < t.green[0]`
+- Upper amber: `value > t.green[1] && value <= t.amber[1]`
+
+### bike: Camera section
+Wrapped in `initRideCameraSection()` inside `bike/src/main.ts`. Returns `{ cameraFrames }` (array reference) since the view-button handler outside the function needs to read it.
+
+Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> | null`. Must be cleared in **three** places: recording start (guard against double-start), stop-recording branch, and camera-close handler.
+
+### bike: Findings generic helper
+`findingsFromMetricGroup<T extends Record<string, MetricResult | null>>` in `bike/src/analysis/findings.ts`. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` to satisfy this constraint.
+
+## Test Coverage
+
+| File | Tests | What's covered |
+|------|-------|----------------|
+| `runalyzr/src/analysis/*.test.ts` | 31 | Gait detection, metrics, thresholds, setup checks |
+| `bike/src/analysis/pedalDetection.test.ts` | 6 | BDC/TDC detection, cadence, cycle segmentation |
+| `bike/src/analysis/metrics.test.ts` | 8 | hipRock, kneeSymmetry |
+| `bike/src/analysis/findings.test.ts` | 8 | generateRear/Sagittal/FrontFindings |
+
+No UI tests — verify camera and recording flows manually in the browser.

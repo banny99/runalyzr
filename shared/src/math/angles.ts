@@ -38,7 +38,9 @@ export function verticalDisplacement(
     .map((f) => f.landmarks[landmarkIndex]?.y ?? 0)
     .filter((y) => y > 0);
   if (ys.length < 2) return 0;
-  return (Math.max(...ys) - Math.min(...ys)) * 100;
+  let lo = ys[0], hi = ys[0];
+  for (const y of ys) { if (y < lo) lo = y; if (y > hi) hi = y; }
+  return (hi - lo) * 100;
 }
 
 export function lateralDisplacement(
@@ -49,5 +51,33 @@ export function lateralDisplacement(
     .map((f) => f.landmarks[landmarkIndex]?.x ?? 0)
     .filter((x) => x > 0);
   if (xs.length < 2) return 0;
-  return (Math.max(...xs) - Math.min(...xs)) * 100;
+  let lo = xs[0], hi = xs[0];
+  for (const x of xs) { if (x < lo) lo = x; if (x > hi) hi = x; }
+  return (hi - lo) * 100;
+}
+
+export function findLocalMaxima(
+  values: number[],
+  minDistance: number,
+  minProminence: number,
+): number[] {
+  const indices: number[] = [];
+  for (let i = 1; i < values.length - 1; i++) {
+    if (values[i] <= values[i - 1] || values[i] < values[i + 1]) continue;
+    if (indices.length > 0 && i - indices[indices.length - 1] < minDistance) continue;
+    const windowStart = Math.max(0, i - minDistance);
+    const windowEnd = Math.min(values.length - 1, i + minDistance);
+    const windowMin = values.slice(windowStart, windowEnd + 1)
+      .reduce((min, v) => (v < min ? v : min), values[i]);
+    if (values[i] - windowMin >= minProminence) indices.push(i);
+  }
+  return indices;
+}
+
+export function findLocalMinima(
+  values: number[],
+  minDistance: number,
+  minProminence: number,
+): number[] {
+  return findLocalMaxima(values.map((v) => -v), minDistance, minProminence);
 }

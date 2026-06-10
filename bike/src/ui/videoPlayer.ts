@@ -10,6 +10,8 @@ export function initVideoPlayer(
   fileInput: HTMLInputElement,
   callbacks: VideoPlayerCallbacks,
 ): void {
+  let currentObjectUrl: string | null = null;
+
   video.addEventListener('loadedmetadata', () => callbacks.onLoadedMetadata?.());
   video.addEventListener('play',           () => callbacks.onPlay?.());
   video.addEventListener('pause',          () => callbacks.onPause?.());
@@ -18,8 +20,9 @@ export function initVideoPlayer(
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    video.src = url;
+    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = URL.createObjectURL(file);
+    video.src = currentObjectUrl;
     video.load();
   });
 }
