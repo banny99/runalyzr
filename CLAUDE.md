@@ -23,7 +23,7 @@ cd runalyzr && npm test           # 31 Vitest tests
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 34 Vitest tests
+cd bike && npm test               # 50 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 ```
 
@@ -103,6 +103,9 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 ### bike: Findings generic helper
 `findingsFromMetricGroup<T extends Record<string, MetricResult | null>>` in `bike/src/analysis/findings.ts`. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` to satisfy this constraint.
 
+### bike: Point placement overlay
+`bike/src/ui/pointPlacement.ts` — fullscreen, promise-based (`openPointPlacement(...): Promise<PlacedPoint[] | null>`, resolves points on Done, `null` on Cancel). Creates its own DOM under `document.body` and never shares DOM/CSS with the step card (the v1 branch failed precisely because the placement canvas lived inside the card layout). Points are normalised to the *image* (0–1 of natural size), not the canvas — the canvas letterboxes. `fitGuide.ts` awaits it for `kind: 'bike'` steps and keeps raw photos in `bikeRawPhotos` so "Edit points" re-edits the original, not the annotated render. Fit steps are a discriminated union (`FitStep = RiderStep | BikeGeometryStep`) in `bike/src/config/defaults.ts`; `AngleDefinition.pointC` only narrows under a positive `reference === 'ab_to_c'` check.
+
 ## Test Coverage
 
 | File | Tests | What's covered |
@@ -113,6 +116,8 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
 | `bike/src/analysis/fitMetrics.test.ts` | 8 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) |
 | `bike/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup |
+| `bike/src/analysis/bikeGeometryMetrics.test.ts` | 11 | computeBikeAngles (signed/unsigned/3-point, aspect scaling), anglePointPairs |
+| `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
 
 All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
 
