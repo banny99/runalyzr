@@ -119,6 +119,23 @@ describe('computeBikeAngles', () => {
     }];
     expect(computeBikeAngles(points, defs, 1)[0].value).toBeCloseTo(90, 0);
   });
+
+  it('applies aspect-ratio scaling in the ab_to_c branch', () => {
+    // A above B, C diagonally off B. AR doubles the x-deltas:
+    // BA = (0, -0.3); BC = (0.3*2, 0.3) = (0.6, 0.3)
+    // cos θ = (0*0.6 + (-0.3)*0.3) / (0.3 * sqrt(0.6²+0.3²)) = -0.4472 → 116.6°
+    // At AR=1 the same points give 135° — confirming the scaling is exercised.
+    const points: PlacedPoint[] = [
+      { id: 'a', x: 0.5, y: 0.2 },
+      { id: 'b', x: 0.5, y: 0.5 },
+      { id: 'c', x: 0.8, y: 0.8 },
+    ];
+    const defs: AngleDefinition[] = [{
+      id: 'corner', label: 'Corner', pointA: 'a', pointB: 'b', pointC: 'c',
+      reference: 'ab_to_c', normalRange: '—',
+    }];
+    expect(computeBikeAngles(points, defs, 2)[0].value).toBeCloseTo(116.6, 1);
+  });
 });
 
 describe('anglePointPairs', () => {
