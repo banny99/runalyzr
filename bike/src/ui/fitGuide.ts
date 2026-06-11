@@ -255,7 +255,7 @@ export function initFitGuide(
       currentStep++;
       renderStep();
     } else {
-      const results: FitSessionResults = { positions: [...positionResults] };
+      const results: FitSessionResults = { positions: [...positionResults], bikeGeometry: [] };
       onComplete(results);
     }
   });
@@ -265,7 +265,7 @@ export function initFitGuide(
       currentStep++;
       renderStep();
     } else {
-      const results: FitSessionResults = { positions: [...positionResults] };
+      const results: FitSessionResults = { positions: [...positionResults], bikeGeometry: [] };
       onComplete(results);
     }
   });
@@ -285,6 +285,6 @@ export function initFitGuide(
       elements.positionSelectEl.hidden = true;
       elements.stepUiEl.hidden = true;
     },
-    getResults: () => ({ positions: [...positionResults] }),
+    getResults: () => ({ positions: [...positionResults], bikeGeometry: [] }),
   };
 }

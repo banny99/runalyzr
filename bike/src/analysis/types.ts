@@ -58,6 +58,30 @@ export interface RideAnalysisResults {
   front:    FrontMetrics | null;
 }
 
+// ── Bike geometry fit ─────────────────────────────────────────────────────
+
+export interface PlacedPoint {
+  id: string;
+  x: number; // 0–1 normalised within the photo (x / image width)
+  y: number; // 0–1 normalised within the photo (y / image height)
+}
+
+export interface BikeAngleMeasurement {
+  id: string;
+  label: string;
+  value: number;      // degrees, rounded to 1 dp
+  normalRange: string;
+}
+
+export interface BikeGeometryResult {
+  stepId: string;
+  stepName: string;
+  imageDataUrl: string;  // annotated full-resolution render (photo + dots + lines + labels)
+  imageAspect: number;   // naturalWidth / naturalHeight — needed for PDF layout
+  points: PlacedPoint[];
+  angles: BikeAngleMeasurement[];
+}
+
 // ── Fit mode ──────────────────────────────────────────────────────────────
 
 export interface FitMeasurement {
@@ -78,6 +102,7 @@ export interface FitPositionResult {
 
 export interface FitSessionResults {
   positions: FitPositionResult[];
+  bikeGeometry: BikeGeometryResult[];
 }
 
 // ── Shared metric toggle state ─────────────────────────────────────────────
