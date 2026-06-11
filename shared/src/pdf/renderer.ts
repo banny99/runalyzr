@@ -48,6 +48,14 @@ export function generateReport(sections: ReportSection[], meta: ReportMeta): voi
     doc.text(section.title, margin, y);
     y += 7;
 
+    if (section.image) {
+      const imgW = Math.min(contentWidth, 120);
+      const imgH = imgW / section.image.aspectRatio;
+      checkPage(imgH + 6);
+      doc.addImage(section.image.dataUrl, 'JPEG', margin, y - 3, imgW, imgH);
+      y += imgH + 4;
+    }
+
     if (section.metrics.length > 0) {
       // Table header
       doc.setFontSize(8);

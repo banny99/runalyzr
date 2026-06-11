@@ -48,6 +48,19 @@ export function generateBikeReport(params: BikeReportParams): void {
 
   // Fit sections — one per completed position
   if (params.fitResults) {
+    for (const bg of params.fitResults.bikeGeometry) {
+      sections.push({
+        title: `Bike Geometry — ${bg.stepName}`,
+        metrics: bg.angles.map((a) => ({
+          label: a.label,
+          result: { value: a.value, status: 'unknown' as const, unit: '°' },
+          normalRange: a.normalRange,
+        })),
+        findings: [],
+        image: { dataUrl: bg.imageDataUrl, aspectRatio: bg.imageAspect },
+      });
+    }
+
     for (const position of params.fitResults.positions) {
       const metricRows: ReportSection['metrics'] = position.measurements.map((m) => ({
         label: m.label,

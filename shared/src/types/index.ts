@@ -26,6 +26,8 @@ export interface ReportSection {
   title: string;
   metrics: Array<{ label: string; result: MetricResult; normalRange?: string }>;
   findings: string[];
+  /** Optional annotated photo rendered above the metric table. */
+  image?: { dataUrl: string; aspectRatio: number };
 }
 
 export interface ReportMeta {
