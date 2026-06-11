@@ -92,7 +92,8 @@ export const FIT_STEPS: FitStep[] = [
       { id: 'seat_tube_angle', label: 'Seat Tube Angle',          pointA: 'bb_centre',        pointB: 'seat_tube_top',    reference: 'horizontal', normalRange: '72–74°' },
       { id: 'head_tube_angle', label: 'Head Tube Angle',          pointA: 'head_tube_bottom', pointB: 'head_tube_top',    reference: 'horizontal', normalRange: '71–74°' },
       { id: 'saddle_tilt',     label: 'Saddle Tilt',              pointA: 'saddle_nose',      pointB: 'saddle_centre',    reference: 'horizontal', signed: true, normalRange: '±2°' },
-      { id: 'bar_drop_angle',  label: 'Bar-to-Saddle Drop Angle', pointA: 'saddle_centre',    pointB: 'handlebar_centre', reference: 'horizontal', normalRange: 'Context-dependent' },
+      // signed: positive = bars below the saddle (drop), negative = bars above (rise)
+      { id: 'bar_drop_angle',  label: 'Bar-to-Saddle Drop Angle', pointA: 'saddle_centre',    pointB: 'handlebar_centre', reference: 'horizontal', signed: true, normalRange: 'Context-dependent' },
     ],
   },
   {
