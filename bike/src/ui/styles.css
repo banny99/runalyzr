@@ -632,3 +632,156 @@ h3 { margin: 1rem 0 0.5rem; }
   #tab-bar { display: flex; }
   body { padding-bottom: 60px; }
 }
+
+/* ── Fullscreen point placement ─────────────────────────────────────── */
+.pp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0b0d11;
+}
+.pp-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.pp-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px;
+  padding: 10px 14px;
+  background: rgba(10, 12, 16, 0.85);
+  border-radius: 10px;
+  color: #e2e8f0;
+}
+.pp-prompt { flex: 1; font-size: 0.95rem; }
+.pp-prompt b { color: #f59e0b; }
+.pp-cancel {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.pp-loupe {
+  position: fixed;
+  z-index: 3;
+  border: 2px solid #f59e0b;
+  border-radius: 50%;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  background: #0b0d11;
+}
+.pp-bottombar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 10px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background: rgba(10, 12, 16, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pp-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.pp-chip {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  background: #1d2330;
+  color: #94a3b8;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.pp-chip.placed { background: #14532d; color: #bbf7d0; }
+.pp-chip.active { border-color: #f59e0b; color: #fcd34d; background: #2a2412; }
+.pp-actions { display: flex; gap: 8px; }
+.pp-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #1d2330;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.pp-actions .pp-done { flex: 2; background: #14532d; font-weight: 600; }
+.pp-actions button:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Step header polish ─────────────────────────────────────────────── */
+.step-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.step-badge-bike { background: #1e3a5f; color: #7dd3fc; }
+.step-badge-rider { background: #14321f; color: #86efac; }
+.fit-progress {
+  height: 4px;
+  background: #1d2330;
+  border-radius: 2px;
+  margin: 6px 0 10px;
+  overflow: hidden;
+}
+#fit-progress-fill {
+  height: 100%;
+  width: 0;
+  background: #22c55e;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+/* ── Selection sections ─────────────────────────────────────────────── */
+.position-section {
+  border: 1px solid #232a35;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.position-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #161a22;
+  font-weight: 600;
+  cursor: pointer;
+}
+.position-section-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1e3a5f;
+  color: #7dd3fc;
+}
+.position-section-badge.rider { background: #14321f; color: #86efac; }
+.position-view-label {
+  padding: 6px 12px 2px;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+.position-section .position-toggle { padding-left: 12px; padding-right: 12px; }
