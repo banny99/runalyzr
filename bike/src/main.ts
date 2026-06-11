@@ -143,6 +143,9 @@ async function main() {
 
   fitDiscardBtn.addEventListener('click', () => {
     fitGuide.reset();
+    // Drop the finished-session snapshot too, or a later mid-session PDF
+    // export would silently use the discarded session's results.
+    lastFitResults = null;
     fitIdleEl.hidden = false;
   });
 

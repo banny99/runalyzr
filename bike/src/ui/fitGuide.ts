@@ -509,6 +509,7 @@ export function initFitGuide(
       renderSelection(new Set(FIT_STEPS.map((s) => s.id)));
     },
     reset() {
+      steps = [];
       currentStep = 0;
       positionResults.length = 0;
       bikeGeometryResults.length = 0;
