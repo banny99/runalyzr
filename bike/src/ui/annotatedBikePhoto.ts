@@ -72,8 +72,9 @@ export function renderAnnotatedBikePhoto(
     for (const line of lines) boxW = Math.max(boxW, ctx.measureText(line).width);
     ctx.fillStyle = 'rgba(10, 12, 16, 0.75)';
     ctx.fillRect(pad, pad, boxW + pad * 2, lines.length * lineH + pad * 1.5);
-    ctx.fillStyle = '#e2e8f0';
+    const statusColor: Record<string, string> = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
     lines.forEach((line, i) => {
+      ctx.fillStyle = statusColor[angles[i].status] ?? '#e2e8f0';
       ctx.fillText(line, pad * 2, pad * 1.6 + (i + 0.6) * lineH);
     });
   }

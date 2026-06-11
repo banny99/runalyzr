@@ -47,8 +47,8 @@ export interface BikePoint {
 }
 
 export type AngleDefinition =
-  | { id: string; label: string; pointA: string; pointB: string; pointC?: never; reference: 'horizontal' | 'vertical'; signed?: true; normalRange: string }
-  | { id: string; label: string; pointA: string; pointB: string; pointC: string; reference: 'ab_to_c'; normalRange: string };
+  | { id: string; label: string; pointA: string; pointB: string; pointC?: never; reference: 'horizontal' | 'vertical'; signed?: true; normalRange: string; green?: [number, number] }
+  | { id: string; label: string; pointA: string; pointB: string; pointC: string; reference: 'ab_to_c'; normalRange: string; green?: [number, number] };
 
 export interface RiderStep {
   kind: 'rider';
@@ -89,10 +89,11 @@ export const FIT_STEPS: FitStep[] = [
       { id: 'saddle_centre',    label: 'Saddle centre' },
     ],
     angles: [
-      { id: 'seat_tube_angle', label: 'Seat Tube Angle',          pointA: 'bb_centre',        pointB: 'seat_tube_top',    reference: 'horizontal', normalRange: '72–74°' },
-      { id: 'head_tube_angle', label: 'Head Tube Angle',          pointA: 'head_tube_bottom', pointB: 'head_tube_top',    reference: 'horizontal', normalRange: '71–74°' },
-      { id: 'saddle_tilt',     label: 'Saddle Tilt',              pointA: 'saddle_nose',      pointB: 'saddle_centre',    reference: 'horizontal', signed: true, normalRange: '±2°' },
-      // signed: positive = bars below the saddle (drop), negative = bars above (rise)
+      { id: 'seat_tube_angle', label: 'Seat Tube Angle',          pointA: 'bb_centre',        pointB: 'seat_tube_top',    reference: 'horizontal', normalRange: '72–74°', green: [72, 74] },
+      { id: 'head_tube_angle', label: 'Head Tube Angle',          pointA: 'head_tube_bottom', pointB: 'head_tube_top',    reference: 'horizontal', normalRange: '71–74°', green: [71, 74] },
+      { id: 'saddle_tilt',     label: 'Saddle Tilt',              pointA: 'saddle_nose',      pointB: 'saddle_centre',    reference: 'horizontal', signed: true, normalRange: '±2°', green: [-2, 2] },
+      // signed: positive = bars below the saddle (drop), negative = bars above (rise).
+      // No green band — acceptable drop depends entirely on the rider/discipline.
       { id: 'bar_drop_angle',  label: 'Bar-to-Saddle Drop Angle', pointA: 'saddle_centre',    pointB: 'handlebar_centre', reference: 'horizontal', signed: true, normalRange: 'Context-dependent' },
     ],
   },
@@ -109,8 +110,8 @@ export const FIT_STEPS: FitStep[] = [
       { id: 'bar_right',    label: 'Handlebar right end' },
     ],
     angles: [
-      { id: 'saddle_level', label: 'Saddle Level', pointA: 'saddle_left', pointB: 'saddle_right', reference: 'horizontal', normalRange: '< 2°' },
-      { id: 'bar_level',    label: 'Bar Level',    pointA: 'bar_left',    pointB: 'bar_right',    reference: 'horizontal', normalRange: '< 2°' },
+      { id: 'saddle_level', label: 'Saddle Level', pointA: 'saddle_left', pointB: 'saddle_right', reference: 'horizontal', normalRange: '< 2°', green: [0, 2] },
+      { id: 'bar_level',    label: 'Bar Level',    pointA: 'bar_left',    pointB: 'bar_right',    reference: 'horizontal', normalRange: '< 2°', green: [0, 2] },
     ],
   },
   // ── Rider on bike ────────────────────────────────────────────────────────────

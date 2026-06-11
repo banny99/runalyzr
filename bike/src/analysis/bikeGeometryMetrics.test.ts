@@ -138,6 +138,31 @@ describe('computeBikeAngles', () => {
   });
 });
 
+describe('computeBikeAngles — status from green band', () => {
+  const defWithBand = (green?: [number, number]): AngleDefinition[] => [{
+    id: 'seat_tube_angle', label: 'Seat Tube Angle',
+    pointA: 'bb_centre', pointB: 'seat_tube_top',
+    reference: 'horizontal', normalRange: '72–74°', green,
+  }];
+  // ~73° tube at AR=1: dx=0.1, |dy|=0.327 → atan2(0.327, 0.1) ≈ 73°
+  const points: PlacedPoint[] = [
+    { id: 'bb_centre',     x: 0.5, y: 0.8 },
+    { id: 'seat_tube_top', x: 0.6, y: 0.473 },
+  ];
+
+  it('marks values inside the band green', () => {
+    expect(computeBikeAngles(points, defWithBand([72, 74]), 1)[0].status).toBe('green');
+  });
+
+  it('marks values outside the band amber', () => {
+    expect(computeBikeAngles(points, defWithBand([74, 76]), 1)[0].status).toBe('amber');
+  });
+
+  it('marks values without a band unknown', () => {
+    expect(computeBikeAngles(points, defWithBand(undefined), 1)[0].status).toBe('unknown');
+  });
+});
+
 describe('anglePointPairs', () => {
   it('derives connection pairs from two-point and three-point definitions', () => {
     const defs: AngleDefinition[] = [

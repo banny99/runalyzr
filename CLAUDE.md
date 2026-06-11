@@ -23,7 +23,7 @@ cd runalyzr && npm test           # 31 Vitest tests
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 50 Vitest tests
+cd bike && npm test               # 57 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 ```
 
@@ -116,8 +116,9 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
 | `bike/src/analysis/fitMetrics.test.ts` | 8 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) |
 | `bike/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup |
-| `bike/src/analysis/bikeGeometryMetrics.test.ts` | 11 | computeBikeAngles (signed/unsigned/3-point, aspect scaling), anglePointPairs |
+| `bike/src/analysis/bikeGeometryMetrics.test.ts` | 14 | computeBikeAngles (signed/unsigned/3-point, aspect scaling, band status), anglePointPairs |
 | `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
+| `bike/src/analysis/bands.test.ts` | 4 | bandStatus green/amber/unknown evaluation |
 
 All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
 

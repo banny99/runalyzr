@@ -152,6 +152,9 @@ export function initFitGuide(
 
   // ── Results panel ─────────────────────────────────────────────────────
 
+  const statusDot = (status: string) =>
+    `<span class="status-dot status-dot-${status}" title="${status}"></span>`;
+
   function renderResults() {
     elements.resultsSections.innerHTML = '';
 
@@ -179,7 +182,7 @@ export function initFitGuide(
       } else {
         for (const a of bg.angles) {
           const row = document.createElement('tr');
-          row.innerHTML = `<td>${a.label}</td><td>${a.value}°</td><td class="normal-range">${a.normalRange}</td>`;
+          row.innerHTML = `<td>${a.label}</td><td>${statusDot(a.status)}${a.value}°</td><td class="normal-range">${a.normalRange}</td>`;
           table.appendChild(row);
         }
       }
@@ -197,7 +200,7 @@ export function initFitGuide(
       table.className = 'metric-table';
       for (const m of result.measurements) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${m.label}</td><td>${m.value}${m.unit}</td><td class="normal-range">${m.normalRange ?? '—'}</td>`;
+        row.innerHTML = `<td>${m.label}</td><td>${statusDot(m.status)}${m.value}${m.unit}</td><td class="normal-range">${m.normalRange ?? '—'}</td>`;
         table.appendChild(row);
       }
       section.appendChild(table);

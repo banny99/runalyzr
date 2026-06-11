@@ -1,5 +1,6 @@
 import type { AngleDefinition } from '../config/defaults';
 import type { PlacedPoint, BikeAngleMeasurement } from './types';
+import { bandStatus } from './bands';
 
 /** Point-id pairs to draw as connection lines, derived from angle definitions. */
 export function anglePointPairs(angleDefs: AngleDefinition[]): [string, string][] {
@@ -58,11 +59,13 @@ export function computeBikeAngles(
       }
     }
 
+    const rounded = parseFloat(value.toFixed(1));
     results.push({
       id: def.id,
       label: def.label,
-      value: parseFloat(value.toFixed(1)),
+      value: rounded,
       normalRange: def.normalRange,
+      status: bandStatus(rounded, def.green),
     });
   }
 

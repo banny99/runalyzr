@@ -1,4 +1,4 @@
-import type { MetricResult, LandmarkArray } from '@runalyzr/shared/types';
+import type { MetricResult, MetricStatus, LandmarkArray } from '@runalyzr/shared/types';
 export type { CameraView, MetricStatus, MetricResult, Landmark, LandmarkArray, FrameData } from '@runalyzr/shared/types';
 
 export type BikeView = 'sagittal' | 'rear' | 'front';
@@ -71,6 +71,7 @@ export interface BikeAngleMeasurement {
   label: string;
   value: number;      // degrees, rounded to 1 dp
   normalRange: string;
+  status: MetricStatus; // green inside the default band, amber outside, unknown when no band
 }
 
 export interface BikeGeometryResult {
@@ -89,6 +90,7 @@ export interface FitMeasurement {
   value: number;
   unit: string;
   normalRange?: string;
+  status: MetricStatus; // green inside the default band, amber outside, unknown when no band
 }
 
 export interface FitPositionResult {
