@@ -112,7 +112,7 @@ export const FIT_STEPS: FitStep[] = [
       { id: 'bar_level',    label: 'Bar Level',    pointA: 'bar_left',    pointB: 'bar_right',    reference: 'horizontal', normalRange: '< 2°' },
     ],
   },
-  // ── Rider on bike (mirrors FIT_POSITIONS; FIT_POSITIONS removed in a later task) ─
+  // ── Rider on bike ────────────────────────────────────────────────────────────
   { kind: 'rider', id: 'side_6oclock',  name: '6 o\'clock — Side',           view: 'side',  instructions: 'Position pedal straight down (6 o\'clock). Stand camera at hip height, 3–5m away, from the rider\'s right side.', keyMeasurements: ['Knee extension at BDC', 'Saddle height indicator'] },
   { kind: 'rider', id: 'side_3oclock',  name: '3 o\'clock — Side',           view: 'side',  instructions: 'Position pedal forward (3 o\'clock). Keep camera position from previous step.',  keyMeasurements: ['Knee-over-pedal stack (KOPS)', 'Hip angle'] },
   { kind: 'rider', id: 'side_9oclock',  name: '9 o\'clock — Side',           view: 'side',  instructions: 'Position pedal back (9 o\'clock). Keep camera position from previous step.',     keyMeasurements: ['Hip extension', 'Back angle'] },
@@ -122,82 +122,6 @@ export const FIT_STEPS: FitStep[] = [
   { kind: 'rider', id: 'rear_neutral',  name: 'Neutral Seated — Rear',       view: 'rear',  instructions: 'Rider sits naturally. Camera stays behind.',                                     keyMeasurements: ['Saddle tilt effect', 'Overall symmetry'] },
   { kind: 'rider', id: 'front_6oclock', name: '6 o\'clock — Front',          view: 'front', instructions: 'Move camera to directly in front of the rider. Pedal at 6 o\'clock.',             keyMeasurements: ['Knee tracking L/R', 'Shoulder level'] },
   { kind: 'rider', id: 'front_neutral', name: 'Neutral Seated — Front',      view: 'front', instructions: 'Rider sits naturally. Camera stays in front.',                                    keyMeasurements: ['Frontal plane symmetry', 'Head position'] },
-];
-
-// ── Fit positions ──────────────────────────────────────────────────────────
-
-export interface FitPosition {
-  id: string;
-  name: string;
-  view: FitView;
-  instructions: string;
-  keyMeasurements: string[];
-}
-
-export const FIT_POSITIONS: FitPosition[] = [
-  {
-    id: 'side_6oclock',
-    name: '6 o\'clock — Side',
-    view: 'side',
-    instructions: 'Position pedal straight down (6 o\'clock). Stand camera at hip height, 3–5m away, from the rider\'s right side.',
-    keyMeasurements: ['Knee extension at BDC', 'Saddle height indicator'],
-  },
-  {
-    id: 'side_3oclock',
-    name: '3 o\'clock — Side',
-    view: 'side',
-    instructions: 'Position pedal forward (3 o\'clock). Keep camera position from previous step.',
-    keyMeasurements: ['Knee-over-pedal stack (KOPS)', 'Hip angle'],
-  },
-  {
-    id: 'side_9oclock',
-    name: '9 o\'clock — Side',
-    view: 'side',
-    instructions: 'Position pedal back (9 o\'clock). Keep camera position from previous step.',
-    keyMeasurements: ['Hip extension', 'Back angle'],
-  },
-  {
-    id: 'side_neutral',
-    name: 'Neutral Seated — Side',
-    view: 'side',
-    instructions: 'Rider sits naturally on the bike, hands on hoods or bars. Keep camera position.',
-    keyMeasurements: ['Torso angle', 'Reach', 'Elbow angle'],
-  },
-  {
-    id: 'side_aero',
-    name: 'Aero / Drop — Side (optional)',
-    view: 'side',
-    instructions: 'Rider in aero position or on the drops. Skip if not applicable.',
-    keyMeasurements: ['Reach in aero', 'Elbow angle', 'Back angle'],
-  },
-  {
-    id: 'rear_6oclock',
-    name: '6 o\'clock — Rear',
-    view: 'rear',
-    instructions: 'Move camera to directly behind the rider. Pedal at 6 o\'clock.',
-    keyMeasurements: ['Hip levelness', 'Knee alignment L vs R'],
-  },
-  {
-    id: 'rear_neutral',
-    name: 'Neutral Seated — Rear',
-    view: 'rear',
-    instructions: 'Rider sits naturally. Camera stays behind.',
-    keyMeasurements: ['Saddle tilt effect', 'Overall symmetry'],
-  },
-  {
-    id: 'front_6oclock',
-    name: '6 o\'clock — Front',
-    view: 'front',
-    instructions: 'Move camera to directly in front of the rider. Pedal at 6 o\'clock.',
-    keyMeasurements: ['Knee tracking L/R', 'Shoulder level'],
-  },
-  {
-    id: 'front_neutral',
-    name: 'Neutral Seated — Front',
-    view: 'front',
-    instructions: 'Rider sits naturally. Camera stays in front.',
-    keyMeasurements: ['Frontal plane symmetry', 'Head position'],
-  },
 ];
 
 // ── Ride metric labels ─────────────────────────────────────────────────────
