@@ -1,9 +1,12 @@
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
-import { FIT_POSITIONS, FitView, POSE_CONNECTIONS, OVERLAY_COLORS } from '../config/defaults';
-import type { FitPosition } from '../config/defaults';
+import { FIT_STEPS, POSE_CONNECTIONS, OVERLAY_COLORS } from '../config/defaults';
+import type { FitStep, FitView, RiderStep, BikeGeometryStep } from '../config/defaults';
 import { analyzeImage } from '../pose/processing';
 import { measureFitPosition } from '../analysis/fitMetrics';
-import type { FitPositionResult, FitSessionResults } from '../analysis/types';
+import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
+import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
+import { openPointPlacement } from './pointPlacement';
+import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
 
 export interface FitGuideController {
   start: () => void;
@@ -15,6 +18,8 @@ export function initFitGuide(
   landmarker: PoseLandmarker,
   elements: {
     stepLabel: HTMLElement;
+    stepBadge: HTMLElement;
+    progressFill: HTMLElement;
     viewLabel: HTMLElement;
     positionName: HTMLElement;
     instructions: HTMLElement;
@@ -25,6 +30,7 @@ export function initFitGuide(
     uploadBtn: HTMLButtonElement;
     prevBtn: HTMLButtonElement;
     retakeBtn: HTMLButtonElement;
+    newPhotoBtn: HTMLButtonElement;
     nextBtn: HTMLButtonElement;
     skipBtn: HTMLButtonElement;
     guidePanel: HTMLElement;
@@ -37,33 +43,81 @@ export function initFitGuide(
   },
   onComplete: (results: FitSessionResults) => void,
 ): FitGuideController {
-  let positions: FitPosition[] = [];
+  let steps: FitStep[] = [];
   let currentStep = 0;
   const positionResults: FitPositionResult[] = [];
+  const bikeGeometryResults: BikeGeometryResult[] = [];
+  // Raw (un-annotated) photos so "Edit points" re-edits on the original image
+  const bikeRawPhotos = new Map<string, string>();
+
+  const viewText = (view: FitView) =>
+    view === 'side' ? 'Side View' : view === 'rear' ? 'Rear View' : 'Front View';
+
+  // ── Step rendering ────────────────────────────────────────────────────
+
+  function renderStepHeader(step: FitStep) {
+    const total = steps.length;
+    elements.stepLabel.textContent = `Step ${currentStep + 1} of ${total}`;
+    elements.progressFill.style.width = `${Math.round(((currentStep + 1) / total) * 100)}%`;
+    elements.viewLabel.textContent = viewText(step.view);
+    elements.stepBadge.hidden = false;
+    elements.stepBadge.textContent = step.kind === 'bike' ? 'bike only' : 'with rider';
+    elements.stepBadge.className =
+      `step-badge ${step.kind === 'bike' ? 'step-badge-bike' : 'step-badge-rider'}`;
+    elements.positionName.textContent = step.name;
+    elements.prevBtn.disabled = currentStep === 0;
+    elements.nextBtn.textContent = currentStep === total - 1 ? 'Finish →' : 'Next →';
+  }
 
   function renderStep() {
-    const pos = positions[currentStep];
-    const total = positions.length;
-    elements.stepLabel.textContent = `Step ${currentStep + 1} of ${total}`;
-    elements.viewLabel.textContent = pos.view === 'side' ? 'Side View' : pos.view === 'rear' ? 'Rear View' : 'Front View';
-    elements.positionName.textContent = pos.name;
-    elements.instructions.textContent = pos.instructions;
+    const step = steps[currentStep];
+    renderStepHeader(step);
+    if (step.kind === 'bike') renderBikeStep(step);
+    else renderRiderStep(step);
+  }
 
+  function renderRiderStep(pos: RiderStep) {
+    elements.instructions.textContent = pos.instructions;
     const hasResult = positionResults.some((r) => r.positionId === pos.id);
     elements.canvasWrap.hidden = !hasResult;
     elements.uploadArea.hidden = hasResult;
     elements.retakeBtn.hidden = !hasResult;
+    elements.retakeBtn.textContent = 'Retake';
+    elements.newPhotoBtn.hidden = true;
     elements.nextBtn.disabled = !hasResult;
-    elements.prevBtn.disabled = currentStep === 0;
-    elements.nextBtn.textContent = currentStep === total - 1 ? 'Finish →' : 'Next →';
 
     if (hasResult) {
       const result = positionResults.find((r) => r.positionId === pos.id)!;
-      drawResultOnCanvas(elements.canvas, result);
+      drawRiderResultOnCanvas(elements.canvas, result);
     }
   }
 
-  function drawResultOnCanvas(canvas: HTMLCanvasElement, result: FitPositionResult) {
+  function renderBikeStep(step: BikeGeometryStep) {
+    const result = bikeGeometryResults.find((r) => r.stepId === step.id);
+    elements.instructions.textContent = result
+      ? 'Review the angles below — Edit points to adjust, or continue.'
+      : step.instructions;
+    elements.canvasWrap.hidden = !result;
+    elements.uploadArea.hidden = !!result;
+    elements.retakeBtn.hidden = !result;
+    elements.retakeBtn.textContent = 'Edit points';
+    elements.newPhotoBtn.hidden = !result;
+    elements.nextBtn.disabled = !result;
+
+    if (result) drawDataUrlOnCanvas(elements.canvas, result.imageDataUrl);
+  }
+
+  function drawDataUrlOnCanvas(canvas: HTMLCanvasElement, dataUrl: string) {
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d')!.drawImage(img, 0, 0);
+    };
+    img.src = dataUrl;
+  }
+
+  function drawRiderResultOnCanvas(canvas: HTMLCanvasElement, result: FitPositionResult) {
     const ctx = canvas.getContext('2d')!;
     const img = new Image();
     img.onload = () => {
@@ -96,93 +150,186 @@ export function initFitGuide(
     img.src = result.imageDataUrl;
   }
 
+  // ── Results panel ─────────────────────────────────────────────────────
+
+  const statusDot = (status: string) =>
+    `<span class="status-dot status-dot-${status}" title="${status}"></span>`;
+
   function renderResults() {
     elements.resultsSections.innerHTML = '';
+
+    for (const bg of bikeGeometryResults) {
+      const section = document.createElement('div');
+      section.className = 'fit-result-section';
+      const heading = document.createElement('h3');
+      heading.textContent = bg.stepName;
+      section.appendChild(heading);
+
+      if (bg.imageDataUrl) {
+        const img = document.createElement('img');
+        img.src = bg.imageDataUrl;
+        img.alt = bg.stepName;
+        img.style.cssText = 'max-width:100%;border-radius:6px;margin-bottom:8px;display:block;';
+        section.appendChild(img);
+      }
+
+      const table = document.createElement('table');
+      table.className = 'metric-table';
+      if (bg.angles.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="3" style="color:#64748b;font-style:italic">No points placed yet</td>';
+        table.appendChild(row);
+      } else {
+        for (const a of bg.angles) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${a.label}</td><td>${statusDot(a.status)}${a.value}°</td><td class="normal-range">${a.normalRange}</td>`;
+          table.appendChild(row);
+        }
+      }
+      section.appendChild(table);
+      elements.resultsSections.appendChild(section);
+    }
+
     for (const result of positionResults) {
       const section = document.createElement('div');
       section.className = 'fit-result-section';
-      section.innerHTML = `<h3>${result.positionName}</h3>`;
+      const heading = document.createElement('h3');
+      heading.textContent = result.positionName;
+      section.appendChild(heading);
       const table = document.createElement('table');
       table.className = 'metric-table';
       for (const m of result.measurements) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${m.label}</td><td>${m.value}${m.unit}</td><td class="normal-range">${m.normalRange ?? '—'}</td>`;
+        row.innerHTML = `<td>${m.label}</td><td>${statusDot(m.status)}${m.value}${m.unit}</td><td class="normal-range">${m.normalRange ?? '—'}</td>`;
         table.appendChild(row);
       }
       section.appendChild(table);
       elements.resultsSections.appendChild(section);
     }
-    elements.resultsContent.hidden = false;
-    elements.resultsEmpty.hidden = true;
-    elements.exportBtn.hidden = false;
+
+    const hasResults = bikeGeometryResults.length > 0 || positionResults.length > 0;
+    elements.resultsContent.hidden = !hasResults;
+    elements.resultsEmpty.hidden = hasResults;
+    elements.exportBtn.hidden = !hasResults;
   }
+
+  // ── Selection screen ──────────────────────────────────────────────────
 
   function renderSelection(selectedIds: Set<string>) {
     elements.stepLabel.textContent = '';
+    elements.stepBadge.hidden = true;
+    elements.progressFill.style.width = '0%';
     elements.positionSelectEl.innerHTML = '';
 
-    const viewOrder: FitView[] = ['side', 'rear', 'front'];
-    const viewLabels: Record<FitView, string> = { side: 'Side View', rear: 'Rear View', front: 'Front View' };
+    let beginBtn: HTMLButtonElement;
 
-    for (const view of viewOrder) {
-      const viewPositions = FIT_POSITIONS.filter((p) => p.view === view);
-      if (viewPositions.length === 0) continue;
+    function makeSection(title: string, badge: string, badgeClass: string, sectionSteps: FitStep[]): HTMLElement {
+      const wrap = document.createElement('div');
+      wrap.className = 'position-section';
 
-      const group = document.createElement('div');
-      group.className = 'position-group';
+      const header = document.createElement('label');
+      header.className = 'position-section-header';
 
-      const heading = document.createElement('h4');
-      heading.textContent = viewLabels[view];
-      group.appendChild(heading);
+      const parentCb = document.createElement('input');
+      parentCb.type = 'checkbox';
 
-      for (const pos of viewPositions) {
-        const label = document.createElement('label');
-        label.className = 'position-toggle';
+      const titleSpan = document.createElement('span');
+      titleSpan.textContent = title;
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = pos.id;
-        checkbox.checked = selectedIds.has(pos.id);
+      const badgeSpan = document.createElement('span');
+      badgeSpan.className = `position-section-badge ${badgeClass}`;
+      badgeSpan.textContent = badge;
 
-        checkbox.addEventListener('change', () => {
-          if (checkbox.checked) {
-            selectedIds.add(pos.id);
-          } else {
-            selectedIds.delete(pos.id);
-          }
-          beginBtn.disabled = selectedIds.size === 0;
-        });
+      header.appendChild(parentCb);
+      header.appendChild(titleSpan);
+      header.appendChild(badgeSpan);
+      wrap.appendChild(header);
 
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(pos.name));
-        group.appendChild(label);
+      const childCbs: HTMLInputElement[] = [];
+      const viewOrder: FitView[] = ['side', 'rear', 'front'];
+
+      for (const view of viewOrder) {
+        const viewSteps = sectionSteps.filter((s) => s.view === view);
+        if (viewSteps.length === 0) continue;
+
+        if (sectionSteps.some((s) => s.view !== viewSteps[0].view)) {
+          const viewLabel = document.createElement('div');
+          viewLabel.className = 'position-view-label';
+          viewLabel.textContent = viewText(view);
+          wrap.appendChild(viewLabel);
+        }
+
+        for (const step of viewSteps) {
+          const label = document.createElement('label');
+          label.className = 'position-toggle';
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = step.id;
+          cb.checked = selectedIds.has(step.id);
+          childCbs.push(cb);
+
+          cb.addEventListener('change', () => {
+            if (cb.checked) selectedIds.add(step.id);
+            else selectedIds.delete(step.id);
+            syncParent();
+            beginBtn.disabled = selectedIds.size === 0;
+          });
+
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(step.name));
+          wrap.appendChild(label);
+        }
       }
 
-      elements.positionSelectEl.appendChild(group);
+      function syncParent() {
+        const checked = childCbs.filter((c) => c.checked).length;
+        parentCb.checked = checked === childCbs.length && childCbs.length > 0;
+        parentCb.indeterminate = checked > 0 && checked < childCbs.length;
+      }
+
+      parentCb.addEventListener('change', () => {
+        childCbs.forEach((c) => {
+          c.checked = parentCb.checked;
+          if (parentCb.checked) selectedIds.add(c.value);
+          else selectedIds.delete(c.value);
+        });
+        beginBtn.disabled = selectedIds.size === 0;
+      });
+
+      syncParent();
+      return wrap;
     }
 
-    const beginBtn = document.createElement('button');
+    const bikeSteps  = FIT_STEPS.filter((s) => s.kind === 'bike');
+    const riderSteps = FIT_STEPS.filter((s) => s.kind === 'rider');
+    elements.positionSelectEl.appendChild(makeSection('Bike Geometry', 'no rider', '', bikeSteps));
+    elements.positionSelectEl.appendChild(makeSection('Rider on Bike', 'with rider', 'rider', riderSteps));
+
+    beginBtn = document.createElement('button');
     beginBtn.className = 'primary-btn';
     beginBtn.textContent = 'Begin Session →';
     beginBtn.disabled = selectedIds.size === 0;
     beginBtn.addEventListener('click', () => {
-      const activePositions = FIT_POSITIONS.filter((p) => selectedIds.has(p.id));
-      startFlow(activePositions);
+      startFlow(FIT_STEPS.filter((s) => selectedIds.has(s.id)));
     });
-
     elements.positionSelectEl.appendChild(beginBtn);
   }
 
-  function startFlow(activePositions: FitPosition[]) {
-    positions = activePositions;
+  function startFlow(activeSteps: FitStep[]) {
+    steps = activeSteps;
     currentStep = 0;
     positionResults.length = 0;
+    bikeGeometryResults.length = 0;
+    bikeRawPhotos.clear();
     elements.positionSelectEl.hidden = true;
     elements.stepUiEl.hidden = false;
     renderStep();
   }
 
-  function processPhoto(file: File) {
+  // ── Rider photo flow (unchanged behaviour) ────────────────────────────
+
+  function processRiderPhoto(file: File, pos: RiderStep) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onerror = () => {
@@ -204,7 +351,6 @@ export function initFitGuide(
         URL.revokeObjectURL(url);
         return;
       }
-      const pos = positions[currentStep];
 
       // Capture the image as data URL for the PDF
       const tempCanvas = document.createElement('canvas');
@@ -226,7 +372,6 @@ export function initFitGuide(
         imageDataUrl,
       };
 
-      // Replace or add
       const idx = positionResults.findIndex((r) => r.positionId === pos.id);
       if (idx >= 0) positionResults[idx] = fitResult;
       else positionResults.push(fitResult);
@@ -237,54 +382,146 @@ export function initFitGuide(
     img.src = url;
   }
 
+  // ── Bike photo flow ───────────────────────────────────────────────────
+
+  function processBikePhoto(file: File, step: BikeGeometryStep) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('Could not load this image. Please try a different photo.');
+    };
+    img.onload = async () => {
+      // Keep the raw photo so Edit points re-edits the original
+      const tmp = document.createElement('canvas');
+      tmp.width = img.naturalWidth;
+      tmp.height = img.naturalHeight;
+      tmp.getContext('2d')!.drawImage(img, 0, 0);
+      bikeRawPhotos.set(step.id, tmp.toDataURL('image/jpeg', 0.85));
+      URL.revokeObjectURL(url);
+
+      const existing = bikeGeometryResults.find((r) => r.stepId === step.id);
+      const pts = await openPointPlacement(img, step, existing?.points ?? []);
+      if (pts !== null) storeBikeResult(step, img, pts);
+      renderStep();
+    };
+    img.src = url;
+  }
+
+  function editBikePoints(step: BikeGeometryStep) {
+    const raw = bikeRawPhotos.get(step.id);
+    const existing = bikeGeometryResults.find((r) => r.stepId === step.id);
+    if (!raw) {
+      elements.fileInput.click();
+      return;
+    }
+    const img = new Image();
+    img.onerror = () => alert('Could not reload the photo. Take a new one.');
+    img.onload = async () => {
+      const pts = await openPointPlacement(img, step, existing?.points ?? []);
+      if (pts !== null) storeBikeResult(step, img, pts);
+      renderStep();
+    };
+    img.src = raw;
+  }
+
+  function storeBikeResult(step: BikeGeometryStep, img: HTMLImageElement, pts: PlacedPoint[]) {
+    const imageAspect = img.naturalWidth / img.naturalHeight;
+    const angles = computeBikeAngles(pts, step.angles, imageAspect);
+    const imageDataUrl = renderAnnotatedBikePhoto(img, step, pts, angles);
+    const result: BikeGeometryResult = {
+      stepId: step.id,
+      stepName: step.name,
+      imageDataUrl,
+      imageAspect,
+      points: pts,
+      angles,
+    };
+    const idx = bikeGeometryResults.findIndex((r) => r.stepId === step.id);
+    if (idx >= 0) bikeGeometryResults[idx] = result;
+    else bikeGeometryResults.push(result);
+    renderResults();
+  }
+
+  // ── Session navigation ────────────────────────────────────────────────
+
+  function buildResults(): FitSessionResults {
+    return { positions: [...positionResults], bikeGeometry: [...bikeGeometryResults] };
+  }
+
+  function finishSession() {
+    onComplete(buildResults());
+    elements.stepUiEl.hidden = true;
+    elements.positionSelectEl.hidden = false;
+    renderResults();
+    renderSelection(new Set(FIT_STEPS.map((s) => s.id)));
+    // On phones, jump to the results tab (desktop shows both panels; the
+    // active classes are ignored by the desktop layout)
+    document.querySelectorAll<HTMLElement>('.tab').forEach((t) =>
+      t.classList.toggle('active', t.dataset.tab === 'results'));
+    document.querySelectorAll<HTMLElement>('.tab-panel').forEach((p) =>
+      p.classList.toggle('active', p.dataset.tab === 'results'));
+  }
+
+  function advance() {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      renderStep();
+    } else {
+      finishSession();
+    }
+  }
+
+  // ── Event wiring ──────────────────────────────────────────────────────
+
   elements.fileInput.addEventListener('change', () => {
     const file = elements.fileInput.files?.[0];
-    if (file) processPhoto(file);
+    if (file) {
+      const step = steps[currentStep];
+      if (step.kind === 'bike') processBikePhoto(file, step);
+      else processRiderPhoto(file, step);
+    }
     elements.fileInput.value = '';
   });
 
   elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
-  elements.retakeBtn.addEventListener('click', () => elements.fileInput.click());
+
+  elements.retakeBtn.addEventListener('click', () => {
+    const step = steps[currentStep];
+    if (step.kind === 'bike') editBikePoints(step);
+    else elements.fileInput.click();
+  });
+
+  elements.newPhotoBtn.addEventListener('click', () => elements.fileInput.click());
 
   elements.prevBtn.addEventListener('click', () => {
-    if (currentStep > 0) { currentStep--; renderStep(); }
-  });
-
-  elements.nextBtn.addEventListener('click', () => {
-    if (currentStep < positions.length - 1) {
-      currentStep++;
+    if (currentStep > 0) {
+      currentStep--;
       renderStep();
-    } else {
-      const results: FitSessionResults = { positions: [...positionResults] };
-      onComplete(results);
     }
   });
 
-  elements.skipBtn.addEventListener('click', () => {
-    if (currentStep < positions.length - 1) {
-      currentStep++;
-      renderStep();
-    } else {
-      const results: FitSessionResults = { positions: [...positionResults] };
-      onComplete(results);
-    }
-  });
+  elements.nextBtn.addEventListener('click', advance);
+  elements.skipBtn.addEventListener('click', advance);
 
   return {
     start() {
       elements.guidePanel.hidden = false;
       elements.stepUiEl.hidden = true;
       elements.positionSelectEl.hidden = false;
-      const selectedIds = new Set(FIT_POSITIONS.map((p) => p.id));
-      renderSelection(selectedIds);
+      renderSelection(new Set(FIT_STEPS.map((s) => s.id)));
     },
     reset() {
+      steps = [];
       currentStep = 0;
       positionResults.length = 0;
+      bikeGeometryResults.length = 0;
+      bikeRawPhotos.clear();
       elements.guidePanel.hidden = true;
       elements.positionSelectEl.hidden = true;
       elements.stepUiEl.hidden = true;
+      renderResults();
     },
-    getResults: () => ({ positions: [...positionResults] }),
+    getResults: buildResults,
   };
 }

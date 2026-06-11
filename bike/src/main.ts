@@ -108,6 +108,8 @@ async function main() {
     landmarker,
     {
       stepLabel:        document.getElementById('fit-step-label')       as HTMLElement,
+      stepBadge:        document.getElementById('fit-step-badge')       as HTMLElement,
+      progressFill:     document.getElementById('fit-progress-fill')    as HTMLElement,
       viewLabel:        document.getElementById('fit-view-label')       as HTMLElement,
       positionName:     document.getElementById('fit-position-name')    as HTMLElement,
       instructions:     document.getElementById('fit-instructions')     as HTMLElement,
@@ -118,6 +120,7 @@ async function main() {
       uploadBtn:        document.getElementById('fit-upload-btn')       as HTMLButtonElement,
       prevBtn:          document.getElementById('fit-prev-btn')         as HTMLButtonElement,
       retakeBtn:        document.getElementById('fit-retake-btn')       as HTMLButtonElement,
+      newPhotoBtn:      document.getElementById('fit-newphoto-btn')     as HTMLButtonElement,
       nextBtn:          document.getElementById('fit-next-btn')         as HTMLButtonElement,
       skipBtn:          document.getElementById('fit-skip-btn')         as HTMLButtonElement,
       guidePanel:       fitGuidePanel,
@@ -140,6 +143,9 @@ async function main() {
 
   fitDiscardBtn.addEventListener('click', () => {
     fitGuide.reset();
+    // Drop the finished-session snapshot too, or a later mid-session PDF
+    // export would silently use the discarded session's results.
+    lastFitResults = null;
     fitIdleEl.hidden = false;
   });
 
@@ -463,8 +469,9 @@ async function main() {
     // Mid-session exports happen before onComplete fires, so fall back to the
     // guide's live results when no finished session has been stored yet.
     const liveFitResults = fitGuide.getResults();
-    const fitResults = lastFitResults
-      ?? (liveFitResults.positions.length > 0 ? liveFitResults : null);
+    const hasLiveResults =
+      liveFitResults.positions.length > 0 || liveFitResults.bikeGeometry.length > 0;
+    const fitResults = lastFitResults ?? (hasLiveResults ? liveFitResults : null);
     generateBikeReport({
       clientName: clientNameInput.value,
       notes: sessionNotesEl.value,
