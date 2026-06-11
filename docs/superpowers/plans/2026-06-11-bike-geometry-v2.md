@@ -393,7 +393,21 @@ export function computeBikeAngles(
 
     let value: number;
 
-    if (def.reference === 'horizontal' || def.reference === 'vertical') {
+    // NOTE: check 'ab_to_c' POSITIVELY first — TypeScript does not narrow
+    // `pointC` to string when this variant is reached by eliminating the
+    // 'horizontal' | 'vertical' variant (multi-member discriminant).
+    if (def.reference === 'ab_to_c') {
+      // interior angle at B
+      const pC = byId[def.pointC];
+      if (!pC) continue;
+      const ax = (pA.x - pB.x) * aspectRatio;
+      const ay = pA.y - pB.y;
+      const cx = (pC.x - pB.x) * aspectRatio;
+      const cy = pC.y - pB.y;
+      const dot = ax * cx + ay * cy;
+      const mag = Math.sqrt((ax * ax + ay * ay) * (cx * cx + cy * cy));
+      value = mag === 0 ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI);
+    } else {
       // De-normalise: scale x by aspectRatio so both axes share the same unit.
       // Canvas y=0 is the top, so dy is positive going downward in the image.
       const dx = (pB.x - pA.x) * aspectRatio;
@@ -410,17 +424,6 @@ export function computeBikeAngles(
       } else {
         value = Math.atan2(Math.abs(dx), Math.abs(dy)) * (180 / Math.PI);
       }
-    } else {
-      // ab_to_c: interior angle at B
-      const pC = byId[def.pointC];
-      if (!pC) continue;
-      const ax = (pA.x - pB.x) * aspectRatio;
-      const ay = pA.y - pB.y;
-      const cx = (pC.x - pB.x) * aspectRatio;
-      const cy = pC.y - pB.y;
-      const dot = ax * cx + ay * cy;
-      const mag = Math.sqrt((ax * ax + ay * ay) * (cx * cx + cy * cy));
-      value = mag === 0 ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI);
     }
 
     results.push({
