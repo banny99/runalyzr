@@ -243,14 +243,23 @@ export function openPointPlacement(
     // Mouse: hover shows crosshair, click places.
     let dragging = false;
     let dragNorm: { x: number; y: number } | null = null;
+    let dragPointerId: number | null = null;
+
+    // rAF throttle state (Fix 3)
+    let rafPending: number | null = null;
+    let latestMoveX = 0;
+    let latestMoveY = 0;
+    let latestMoveType = '';
 
     function onPointerDown(e: PointerEvent) {
       if (e.pointerType === 'touch') {
+        if (dragging) return; // Fix 2: ignore second touch while drag is live
         const norm = clientToImageNorm(e.clientX, e.clientY);
         if (!norm || activeIndex >= step.points.length) return;
         e.preventDefault();
         dragging = true;
         dragNorm = norm;
+        dragPointerId = e.pointerId; // Fix 2: record active pointer
         canvas.setPointerCapture(e.pointerId);
         draw(norm);
         showLoupe(norm, e.clientX, e.clientY);
@@ -258,24 +267,38 @@ export function openPointPlacement(
     }
 
     function onPointerMove(e: PointerEvent) {
-      const norm = clientToImageNorm(e.clientX, e.clientY);
       if (e.pointerType === 'touch') {
         if (!dragging) return;
+        if (e.pointerId !== dragPointerId) return; // Fix 2: ignore foreign pointers
         e.preventDefault();
-        if (norm) {
-          dragNorm = norm;
-          draw(norm);
-          showLoupe(norm, e.clientX, e.clientY);
-        }
-      } else {
-        draw(norm ?? undefined);
       }
+      // Fix 3: store latest values and coalesce via rAF
+      latestMoveX = e.clientX;
+      latestMoveY = e.clientY;
+      latestMoveType = e.pointerType;
+      if (rafPending !== null) return;
+      rafPending = requestAnimationFrame(() => {
+        rafPending = null;
+        const norm = clientToImageNorm(latestMoveX, latestMoveY);
+        if (latestMoveType === 'touch') {
+          if (!dragging) return;
+          if (norm) {
+            dragNorm = norm;
+            draw(norm);
+            showLoupe(norm, latestMoveX, latestMoveY);
+          }
+        } else {
+          draw(norm ?? undefined);
+        }
+      });
     }
 
     function onPointerUp(e: PointerEvent) {
       if (e.pointerType === 'touch') {
         if (!dragging) return;
+        if (e.pointerId !== dragPointerId) return; // Fix 2: ignore foreign pointers
         dragging = false;
+        dragPointerId = null; // Fix 2: reset
         hideLoupe();
         if (dragNorm) placeAt(dragNorm);
         dragNorm = null;
@@ -283,6 +306,16 @@ export function openPointPlacement(
         const norm = clientToImageNorm(e.clientX, e.clientY);
         if (norm) placeAt(norm);
       }
+    }
+
+    // Fix 1: abort drag without placing if the browser cancels the touch
+    function onPointerCancel() {
+      if (!dragging) return;
+      dragging = false;
+      dragPointerId = null;
+      dragNorm = null;
+      hideLoupe();
+      draw();
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -298,6 +331,7 @@ export function openPointPlacement(
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel); // Fix 1
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', onResize);
 
@@ -322,6 +356,8 @@ export function openPointPlacement(
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel); // Fix 1
+      if (rafPending !== null) { cancelAnimationFrame(rafPending); rafPending = null; } // Fix 3
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', onResize);
       document.body.style.overflow = prevBodyOverflow;
