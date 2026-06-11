@@ -664,7 +664,7 @@ h3 { margin: 1rem 0 0.5rem; }
   color: #e2e8f0;
 }
 .pp-prompt { flex: 1; font-size: 0.95rem; }
-.pp-prompt b { color: #f59e0b; }
+.pp-prompt b { color: var(--amber); }
 .pp-cancel {
   background: none;
   border: none;
@@ -676,7 +676,7 @@ h3 { margin: 1rem 0 0.5rem; }
 .pp-loupe {
   position: fixed;
   z-index: 3;
-  border: 2px solid #f59e0b;
+  border: 2px solid var(--amber);
   border-radius: 50%;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
   pointer-events: none;
@@ -712,7 +712,7 @@ h3 { margin: 1rem 0 0.5rem; }
   cursor: pointer;
 }
 .pp-chip.placed { background: #14532d; color: #bbf7d0; }
-.pp-chip.active { border-color: #f59e0b; color: #fcd34d; background: #2a2412; }
+.pp-chip.active { border-color: var(--amber); color: #fcd34d; background: #2a2412; }
 .pp-actions { display: flex; gap: 8px; }
 .pp-actions button {
   flex: 1;
@@ -747,7 +747,7 @@ h3 { margin: 1rem 0 0.5rem; }
 #fit-progress-fill {
   height: 100%;
   width: 0;
-  background: #22c55e;
+  background: var(--green);
   border-radius: 2px;
   transition: width 0.25s ease;
 }
