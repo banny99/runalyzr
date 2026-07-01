@@ -23,7 +23,7 @@ cd runalyzr && npm test           # 31 Vitest tests
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 57 Vitest tests
+cd bike && npm test               # 63 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 ```
 
@@ -103,6 +103,9 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 ### bike: Findings generic helper
 `findingsFromMetricGroup<T extends Record<string, MetricResult | null>>` in `bike/src/analysis/findings.ts`. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` to satisfy this constraint.
 
+### bike: Photo source (fit steps)
+`bike/src/ui/photoSource.ts` — `createPhotoSource(els, onFile)` wires a two-button still-photo picker: **Upload Photo** (`accept="image/*"`) → files/gallery, **Take Photo** (`capture="environment"`) → device camera. Uses native OS capture, not `getUserMedia` (ride mode's live camera is a separate video/MediaRecorder path). Returns `openUpload()`/`openCamera()` so `fitGuide.ts`'s nav buttons drive it programmatically (rider **Retake** → camera, **New photo** → files). This is the reusable sibling of ride mode's Upload-Video/Use-Camera buttons — don't re-inline the button→input→onFile wiring at call sites.
+
 ### bike: Point placement overlay
 `bike/src/ui/pointPlacement.ts` — fullscreen, promise-based (`openPointPlacement(...): Promise<PlacedPoint[] | null>`, resolves points on Done, `null` on Cancel). Creates its own DOM under `document.body` and never shares DOM/CSS with the step card (the v1 branch failed precisely because the placement canvas lived inside the card layout). Points are normalised to the *image* (0–1 of natural size), not the canvas — the canvas letterboxes. `fitGuide.ts` awaits it for `kind: 'bike'` steps and keeps raw photos in `bikeRawPhotos` so "Edit points" re-edits the original, not the annotated render. Fit steps are a discriminated union (`FitStep = RiderStep | BikeGeometryStep`) in `bike/src/config/defaults.ts`; `AngleDefinition.pointC` only narrows under a positive `reference === 'ab_to_c'` check.
 
@@ -119,7 +122,8 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/analysis/bikeGeometryMetrics.test.ts` | 14 | computeBikeAngles (signed/unsigned/3-point, aspect scaling, band status), anglePointPairs |
 | `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
 | `bike/src/analysis/bands.test.ts` | 4 | bandStatus green/amber/unknown evaluation |
+| `bike/src/ui/photoSource.test.ts` | 6 | createPhotoSource button→input delegation, onFile dispatch, value reset (jsdom) |
 
 All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
 
-No UI tests — verify camera and recording flows manually in the browser.
+UI is mostly untested — verify camera and recording flows manually in the browser. The one exception is `photoSource.test.ts`, a jsdom-based test of pure DOM wiring (`// @vitest-environment jsdom` per-file; `jsdom` is a bike dev dependency). Native `capture="environment"` camera behavior still can't be exercised headlessly — verify on a real phone.
