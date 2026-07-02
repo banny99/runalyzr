@@ -6,7 +6,6 @@ import { measureFitPosition } from '../analysis/fitMetrics';
 import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
 import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
 import { openPointPlacement } from './pointPlacement';
-import { createPhotoSource } from './photoSource';
 import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
 
 export interface FitGuideController {
@@ -28,9 +27,7 @@ export function initFitGuide(
     canvas: HTMLCanvasElement;
     uploadArea: HTMLElement;
     fileInput: HTMLInputElement;
-    captureInput: HTMLInputElement;
     uploadBtn: HTMLButtonElement;
-    cameraBtn: HTMLButtonElement;
     prevBtn: HTMLButtonElement;
     retakeBtn: HTMLButtonElement;
     newPhotoBtn: HTMLButtonElement;
@@ -415,7 +412,7 @@ export function initFitGuide(
     const raw = bikeRawPhotos.get(step.id);
     const existing = bikeGeometryResults.find((r) => r.stepId === step.id);
     if (!raw) {
-      photo.openUpload();
+      elements.fileInput.click();
       return;
     }
     const img = new Image();
@@ -477,27 +474,25 @@ export function initFitGuide(
 
   // ── Event wiring ──────────────────────────────────────────────────────
 
-  const photo = createPhotoSource(
-    {
-      uploadBtn: elements.uploadBtn,
-      cameraBtn: elements.cameraBtn,
-      uploadInput: elements.fileInput,
-      captureInput: elements.captureInput,
-    },
-    (file) => {
+  elements.fileInput.addEventListener('change', () => {
+    const file = elements.fileInput.files?.[0];
+    if (file) {
       const step = steps[currentStep];
       if (step.kind === 'bike') processBikePhoto(file, step);
       else processRiderPhoto(file, step);
-    },
-  );
+    }
+    elements.fileInput.value = '';
+  });
+
+  elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
 
   elements.retakeBtn.addEventListener('click', () => {
     const step = steps[currentStep];
     if (step.kind === 'bike') editBikePoints(step);
-    else photo.openCamera(); // rider: re-shoot with the camera
+    else elements.fileInput.click();
   });
 
-  elements.newPhotoBtn.addEventListener('click', () => photo.openUpload());
+  elements.newPhotoBtn.addEventListener('click', () => elements.fileInput.click());
 
   elements.prevBtn.addEventListener('click', () => {
     if (currentStep > 0) {
