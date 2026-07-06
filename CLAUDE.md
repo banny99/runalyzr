@@ -100,6 +100,8 @@ Wrapped in `initRideCameraSection()` inside `bike/src/main.ts`. Returns `{ camer
 
 Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> | null`. Must be cleared in **three** places: recording start (guard against double-start), stop-recording branch, and camera-close handler.
 
+**Ride video upload** relies on the video's **native `controls`**: `videoPlayer.ts` sets `video.controls = true` when a file is loaded and `false` in `startCamera`/`stopCamera` (camera uses the app's own record button). Playback is what drives frame collection — `onPlay → loop.start()` (which sets the landmarker to VIDEO mode), analysis runs on `pause`/`ended`. Without controls there is no way to play an uploaded video, so don't remove them. The `#ride-overlay` skeleton canvas is `pointer-events: none`, so native controls stay clickable underneath.
+
 ### bike: Findings generic helper
 `findingsFromMetricGroup<T extends Record<string, MetricResult | null>>` in `bike/src/analysis/findings.ts`. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` to satisfy this constraint.
 
