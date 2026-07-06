@@ -20,6 +20,8 @@ export const THRESHOLDS: Partial<Record<AllMetricKeys, ThresholdEntry>> = {
   torsoAngle:             { green: [35,  50],  amber: [25,  35],  unit: '°',     direction: 'lower_is_worse' },
   pelvicTilt:             { green: [0,   3],   amber: [3,   6],   unit: ' cm',   direction: 'higher_is_worse' },
   elbowAngle:             { green: [90,  160], amber: [70,  90],  unit: '°',     direction: 'lower_is_worse' },
+  shoulderAngle:          { green: [0, 999],   amber: [0,   0],   unit: '°',     direction: 'higher_is_worse', indicativeOnly: true },
+  reachAngle:             { green: [0, 999],   amber: [0,   0],   unit: '°',     direction: 'higher_is_worse', indicativeOnly: true },
   wristAngle:             { green: [0,   10],  amber: [10,  20],  unit: '°',     direction: 'higher_is_worse' },
   ankleAnkling:           { green: [3,   10],  amber: [1,   3],   unit: ' cm',   direction: 'lower_is_worse' },
   cadence:                { green: [80,  100], amber: [70,  80],  unit: ' rpm',  direction: 'lower_is_worse' },

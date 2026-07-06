@@ -63,6 +63,8 @@ describe('generateSagittalFindings', () => {
       torsoAngle:             null,
       pelvicTilt:             null,
       elbowAngle:             null,
+      shoulderAngle:          null,
+      reachAngle:             null,
       wristAngle:             null,
       ankleAnkling:           null,
       cadence:                null,

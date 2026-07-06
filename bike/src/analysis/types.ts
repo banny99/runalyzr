@@ -32,6 +32,8 @@ export interface SagittalMetrics extends Record<string, MetricResult | null> {
   torsoAngle:             MetricResult | null;
   pelvicTilt:             MetricResult | null;
   elbowAngle:             MetricResult | null;
+  shoulderAngle:          MetricResult | null;
+  reachAngle:             MetricResult | null;
   wristAngle:             MetricResult | null;
   ankleAnkling:           MetricResult | null;
   cadence:                MetricResult | null;
