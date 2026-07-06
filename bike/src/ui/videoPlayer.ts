@@ -36,6 +36,9 @@ export async function startCamera(video: HTMLVideoElement): Promise<void> {
     audio: false,
   });
   video.controls = false; // live camera uses the app's own record UI, not native controls
+  // Drop any uploaded file src so it can't resurface (without controls) when the
+  // camera stops and srcObject is cleared — otherwise the browser falls back to it.
+  video.removeAttribute('src');
   video.srcObject = stream;
   await video.play();
 }
