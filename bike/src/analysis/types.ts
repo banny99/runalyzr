@@ -99,7 +99,8 @@ export interface FitPositionResult {
   landmarks: LandmarkArray;
   worldLandmarks: LandmarkArray;
   measurements: FitMeasurement[];
-  imageDataUrl: string;
+  imageDataUrl: string;  // annotated full-resolution render (photo + skeleton)
+  imageAspect: number;   // naturalWidth / naturalHeight — needed for PDF layout
 }
 
 export interface FitSessionResults {

@@ -7,6 +7,7 @@ import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
 import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
 import { openPointPlacement } from './pointPlacement';
 import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
+import type { LandmarkArray } from '@runalyzr/shared/types';
 
 export interface FitGuideController {
   start: () => void;
@@ -88,7 +89,7 @@ export function initFitGuide(
 
     if (hasResult) {
       const result = positionResults.find((r) => r.positionId === pos.id)!;
-      drawRiderResultOnCanvas(elements.canvas, result);
+      drawDataUrlOnCanvas(elements.canvas, result.imageDataUrl);
     }
   }
 
@@ -117,37 +118,27 @@ export function initFitGuide(
     img.src = dataUrl;
   }
 
-  function drawRiderResultOnCanvas(canvas: HTMLCanvasElement, result: FitPositionResult) {
-    const ctx = canvas.getContext('2d')!;
-    const img = new Image();
-    img.onload = () => {
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
-      const w = canvas.width;
-      const h = canvas.height;
-      const lm = result.landmarks;
-
-      ctx.lineWidth = 2;
-      for (const [a, b] of POSE_CONNECTIONS) {
-        const lmA = lm[a];
-        const lmB = lm[b];
-        if (!lmA || !lmB) continue;
-        ctx.strokeStyle = OVERLAY_COLORS.neutral;
-        ctx.beginPath();
-        ctx.moveTo(lmA.x * w, lmA.y * h);
-        ctx.lineTo(lmB.x * w, lmB.y * h);
-        ctx.stroke();
-      }
-      for (const l of lm) {
-        if (!l || (l.visibility ?? 1) < 0.4) continue;
-        ctx.fillStyle = OVERLAY_COLORS.neutral;
-        ctx.beginPath();
-        ctx.arc(l.x * w, l.y * h, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    };
-    img.src = result.imageDataUrl;
+  // Bakes the pose skeleton onto a context at the given pixel size. Used both
+  // for the on-screen result and the annotated photo stored for the PDF report.
+  function drawPoseSkeleton(ctx: CanvasRenderingContext2D, lm: LandmarkArray, w: number, h: number) {
+    ctx.lineWidth = 2;
+    for (const [a, b] of POSE_CONNECTIONS) {
+      const lmA = lm[a];
+      const lmB = lm[b];
+      if (!lmA || !lmB) continue;
+      ctx.strokeStyle = OVERLAY_COLORS.neutral;
+      ctx.beginPath();
+      ctx.moveTo(lmA.x * w, lmA.y * h);
+      ctx.lineTo(lmB.x * w, lmB.y * h);
+      ctx.stroke();
+    }
+    for (const l of lm) {
+      if (!l || (l.visibility ?? 1) < 0.4) continue;
+      ctx.fillStyle = OVERLAY_COLORS.neutral;
+      ctx.beginPath();
+      ctx.arc(l.x * w, l.y * h, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // ── Results panel ─────────────────────────────────────────────────────
@@ -352,13 +343,16 @@ export function initFitGuide(
         return;
       }
 
-      // Capture the image as data URL for the PDF
+      // Bake the photo + skeleton into a data URL for the on-screen result and
+      // the PDF report (the skeleton is the analysis output, so it must show).
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = img.naturalWidth;
       tempCanvas.height = img.naturalHeight;
       const tempCtx = tempCanvas.getContext('2d')!;
       tempCtx.drawImage(img, 0, 0);
+      drawPoseSkeleton(tempCtx, result.landmarks, tempCanvas.width, tempCanvas.height);
       const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
+      const imageAspect = img.naturalWidth / img.naturalHeight;
       URL.revokeObjectURL(url);
 
       const measurements = measureFitPosition(pos.id, result.worldLandmarks);
@@ -370,6 +364,7 @@ export function initFitGuide(
         worldLandmarks: result.worldLandmarks,
         measurements,
         imageDataUrl,
+        imageAspect,
       };
 
       const idx = positionResults.findIndex((r) => r.positionId === pos.id);

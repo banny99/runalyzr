@@ -29,7 +29,7 @@ function buildSection(
   return { title, metrics: metricRows, findings };
 }
 
-export function generateBikeReport(params: BikeReportParams): void {
+export function buildReportSections(params: BikeReportParams): ReportSection[] {
   const sections: ReportSection[] = [];
 
   // Ride sections
@@ -71,9 +71,16 @@ export function generateBikeReport(params: BikeReportParams): void {
         title: `Fit — ${position.positionName}`,
         metrics: metricRows,
         findings: [],
+        image: { dataUrl: position.imageDataUrl, aspectRatio: position.imageAspect },
       });
     }
   }
+
+  return sections;
+}
+
+export function generateBikeReport(params: BikeReportParams): void {
+  const sections = buildReportSections(params);
 
   const reportTitle = params.rideResults && params.fitResults
     ? 'Bike Fit & Ride Analysis Report'
