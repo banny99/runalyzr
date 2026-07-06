@@ -1,5 +1,5 @@
 import type { FrameData } from '@runalyzr/shared/types';
-import { angleBetweenThreePoints, midpoint } from '@runalyzr/shared/math';
+import { angleBetweenThreePoints, midpoint, lateralAngle } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../../config/defaults';
 import type { PedalEvent, PedalCycle, SagittalMetrics } from '../types';
 import { makeMetricResult } from '../thresholds';
@@ -144,15 +144,13 @@ export function calculateSagittalMetrics(
   // Reach angle — shoulder→wrist lean from vertical, bilateral average across
   // all frames (informational; no band yet).
   const reachAngle = (() => {
-    const fromVertical = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-      Math.abs((Math.atan2(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * 180) / Math.PI);
     const angles = frames.map((f) => {
       const ls = f.worldLandmarks[L.LEFT_SHOULDER];
       const lw = f.worldLandmarks[L.LEFT_WRIST];
       const rs = f.worldLandmarks[L.RIGHT_SHOULDER];
       const rw = f.worldLandmarks[L.RIGHT_WRIST];
       if (!ls || !lw || !rs || !rw) return null;
-      return (fromVertical(ls, lw) + fromVertical(rs, rw)) / 2;
+      return (lateralAngle(ls, lw) + lateralAngle(rs, rw)) / 2;
     }).filter((v): v is number => v !== null);
     return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : null;
   })();

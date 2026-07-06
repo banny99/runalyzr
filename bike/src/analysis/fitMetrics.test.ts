@@ -69,7 +69,18 @@ describe('sideUpperBody — torso / elbow / reach / shoulder', () => {
     expect(by('Shoulder Angle').status).toBe('unknown');  // informational
   });
 
-  it('returns [] when arm landmarks are missing', () => {
+  it('still reports torso lean when the hand/elbow is occluded (shoulder+hip only)', () => {
+    // Sparse array: only shoulder + hip present, elbow/wrist absent (undefined),
+    // as happens when the near-side hand is occluded at 9 o'clock.
+    const wlm: LandmarkArray = [];
+    wlm[L.LEFT_SHOULDER] = lm(0, -0.5);
+    wlm[L.LEFT_HIP] = lm(0, 0);
+    const r = sideUpperBody(wlm);
+    expect(r.map((m) => m.label)).toEqual(['Torso Angle']);
+    expect(r[0].value).toBeCloseTo(0, 1);
+  });
+
+  it('returns [] when no upper-body landmarks are available', () => {
     expect(sideUpperBody([])).toHaveLength(0);
   });
 });

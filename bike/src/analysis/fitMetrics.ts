@@ -56,18 +56,19 @@ export function sideUpperBody(wlm: LandmarkArray): FitMeasurement[] {
   const lh = wlm[L.LEFT_HIP];
   const le = wlm[L.LEFT_ELBOW];
   const lw = wlm[L.LEFT_WRIST];
-  if (!ls || !lh || !le || !lw) return [];
 
-  // Lean of the a→b segment from vertical, in degrees (0° = straight down).
-  const fromVertical = (a: Landmark, b: Landmark) =>
-    Math.abs((Math.atan2(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) * 180) / Math.PI);
-
-  return [
-    entry('Torso Angle',    fromVertical(ls, lh),                                     '35–50°',  [35, 50]),
-    entry('Elbow Angle',    angle(wlm, L.LEFT_SHOULDER, L.LEFT_ELBOW, L.LEFT_WRIST),  '90–160°', [90, 160]),
-    entry('Reach Angle',    fromVertical(ls, lw),                                     '—'),
-    entry('Shoulder Angle', angle(wlm, L.LEFT_HIP, L.LEFT_SHOULDER, L.LEFT_ELBOW),    '—'),
-  ];
+  // Each angle is emitted independently so a missing hand (common at the
+  // 9 o'clock back-pedal phase, where the forearm is often occluded) doesn't
+  // drop torso lean, which needs only shoulder + hip. `lateralAngle` is the
+  // lean of a segment from vertical (0° = straight down). Torso uses the band
+  // shared with the ride-video torsoAngle ([35,50]); Reach and the new
+  // Shoulder angle are informational (no band → 'unknown') pending calibration.
+  const out: FitMeasurement[] = [];
+  if (ls && lh)       out.push(entry('Torso Angle',    lateralAngle(ls, lh),                 '35–50°',  [35, 50]));
+  if (ls && le && lw) out.push(entry('Elbow Angle',    angleBetweenThreePoints(ls, le, lw),  '90–160°', [90, 160]));
+  if (ls && lw)       out.push(entry('Reach Angle',    lateralAngle(ls, lw),                 '—'));
+  if (lh && ls && le) out.push(entry('Shoulder Angle', angleBetweenThreePoints(lh, ls, le),  '—'));
+  return out;
 }
 
 export function measureSide6OClock(wlm: LandmarkArray): FitMeasurement[] {
