@@ -63,6 +63,12 @@ export function initVideoPlayer(
   });
 
   function onKeydown(e: KeyboardEvent): void {
+    // Frame-stepping only applies to file review: skip while the live camera
+    // is active (pausing a stream-backed element freezes preview + recording)
+    // and while typing in form fields (the report modal needs its caret keys).
+    if (video.srcObject) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       video.pause();
@@ -82,6 +88,10 @@ export async function startCamera(video: HTMLVideoElement): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
   });
+  // Drop any uploaded file src so it can't resurface when the camera stops and
+  // srcObject is cleared — otherwise the browser falls back to it. (Same fix
+  // as bike's videoPlayer.)
+  video.removeAttribute('src');
   video.srcObject = stream;
   await video.play();
 }
