@@ -54,6 +54,9 @@ export function initCameraController(deps: CameraControllerDeps) {
   } = deps;
 
   let cameraState: 'closed' | 'setup' | 'recording' = 'closed';
+  // Read via a function where control-flow narrowing would otherwise hide
+  // cross-closure mutations (close() can run during open()'s await).
+  const isClosed = () => cameraState === 'closed';
   let cameraRunning = false;
   let cameraRafId = 0;
   let setupConsecutiveFrames = 0;
@@ -356,6 +359,13 @@ export function initCameraController(deps: CameraControllerDeps) {
       }
       shareVideoBtn.style.display = 'none';
       await startCamera(video);
+      // The user may have hit ✕ while the permission prompt was pending —
+      // close() already ran, so release the just-acquired stream and bail
+      // instead of resurrecting a hot camera under the idle/file UI.
+      if (isClosed()) {
+        stopCamera(video);
+        return;
+      }
       overlay.syncSize();
       video.addEventListener('resize', () => overlay.syncSize(), { once: true });
       recordBtn.disabled = true;

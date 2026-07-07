@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { initVideoPlayer, startCamera } from './videoPlayer';
 
 function setupDom() {
@@ -36,12 +36,15 @@ describe('initVideoPlayer — playback controls', () => {
     cleanup = initVideoPlayer(video, fileInput, noopCallbacks);
   });
 
+  // Cleanup must run even when an expect fails — a leaked document listener
+  // bound to a previous test's video would cascade failures across tests.
+  afterEach(() => cleanup());
+
   it('play/pause button starts playback when paused', () => {
     const play = vi.spyOn(video, 'play').mockImplementation(() => Promise.resolve());
     Object.defineProperty(video, 'paused', { configurable: true, value: true });
     (document.getElementById('play-pause') as HTMLButtonElement).click();
     expect(play).toHaveBeenCalledOnce();
-    cleanup();
   });
 
   it('play/pause button pauses playback when playing', () => {
@@ -49,16 +52,17 @@ describe('initVideoPlayer — playback controls', () => {
     Object.defineProperty(video, 'paused', { configurable: true, value: false });
     (document.getElementById('play-pause') as HTMLButtonElement).click();
     expect(pause).toHaveBeenCalledOnce();
-    cleanup();
   });
 
   it('arrow keys frame-step the video during file review', () => {
     const pause = vi.spyOn(video, 'pause').mockImplementation(() => {});
     Object.defineProperty(video, 'duration', { configurable: true, value: 10 });
     video.currentTime = 5;
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    document.dispatchEvent(ev);
     expect(pause).toHaveBeenCalled();
-    cleanup();
+    expect(video.currentTime).toBeCloseTo(5 + 1 / 30, 5);
+    expect(ev.defaultPrevented).toBe(true);
   });
 
   it('arrow keys are ignored while typing in a text input (report modal)', () => {
@@ -69,7 +73,6 @@ describe('initVideoPlayer — playback controls', () => {
     input.dispatchEvent(ev);
     expect(pause).not.toHaveBeenCalled();
     expect(ev.defaultPrevented).toBe(false); // caret movement must survive
-    cleanup();
   });
 
   it('arrow keys are ignored while the live camera is active (srcObject set)', () => {
@@ -77,7 +80,6 @@ describe('initVideoPlayer — playback controls', () => {
     Object.defineProperty(video, 'srcObject', { configurable: true, value: {} });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     expect(pause).not.toHaveBeenCalled();
-    cleanup();
   });
 
   it('cleanup removes the keydown handler', () => {
@@ -89,13 +91,15 @@ describe('initVideoPlayer — playback controls', () => {
 });
 
 describe('startCamera — upload → camera transition', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('clears a stale uploaded src so it cannot resurface after stopCamera', async () => {
     const { video } = setupDom();
     video.src = 'blob:http://localhost/stale-upload';
     const play = vi.spyOn(video, 'play').mockImplementation(() => Promise.resolve());
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue({}) },
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({}) },
     });
     Object.defineProperty(video, 'srcObject', { configurable: true, writable: true, value: null });
     await startCamera(video);
