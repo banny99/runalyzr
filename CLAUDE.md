@@ -23,7 +23,7 @@ cd runalyzr && npm test           # 31 Vitest tests
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 60 Vitest tests
+cd bike && npm test               # 64 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 ```
 
@@ -116,7 +116,7 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/analysis/pedalDetection.test.ts` | 7 | BDC/TDC detection, cadence, cycle segmentation |
 | `bike/src/analysis/metrics.test.ts` | 5 | hipRock, kneeSymmetry |
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
-| `bike/src/analysis/fitMetrics.test.ts` | 8 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) |
+| `bike/src/analysis/fitMetrics.test.ts` | 12 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) + per-position upper-body angles (`sideUpperBody`, incl. graceful degradation) and front lateral trunk lean |
 | `bike/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup |
 | `bike/src/analysis/bikeGeometryMetrics.test.ts` | 14 | computeBikeAngles (signed/unsigned/3-point, aspect scaling, band status), anglePointPairs |
 | `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
@@ -124,5 +124,7 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/report/pdfGenerator.test.ts` | 3 | buildReportSections includes rider + bike-geometry photos as section images |
 
 All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
+
+**Upper-body fit angles** (torso, elbow, reach, shoulder) are captured **per side crank position** via `sideUpperBody(wlm)` in `fitMetrics.ts` (appended to `measureSide6OClock`/`3`/`9`) — the old dedicated "Neutral Seated" steps were removed as vague/duplicative. Torso and elbow use validated bands; **Reach and Shoulder are informational** (no band → `status: 'unknown'`) pending calibration. The ride video mirrors this: `shoulderAngle` and `reachAngle` are averaged across frames in `metrics/sagittal.ts` and flagged `indicativeOnly` in `thresholds.ts`.
 
 No UI tests — verify camera and recording flows manually in the browser.

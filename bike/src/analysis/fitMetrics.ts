@@ -44,12 +44,40 @@ function kneeFrontalDeviation(hip: Landmark, knee: Landmark, ankle: Landmark): n
   return d;
 }
 
+/**
+ * Upper-body angles captured on every side-view crank position (hands on
+ * bars, so shoulder/elbow/wrist are visible regardless of pedal phase). Torso
+ * and elbow reuse validated bands; Reach and the new Shoulder angle are
+ * informational (no band → 'unknown' status) pending calibration on real data.
+ * Returns [] when the arm/torso landmarks aren't available.
+ */
+export function sideUpperBody(wlm: LandmarkArray): FitMeasurement[] {
+  const ls = wlm[L.LEFT_SHOULDER];
+  const lh = wlm[L.LEFT_HIP];
+  const le = wlm[L.LEFT_ELBOW];
+  const lw = wlm[L.LEFT_WRIST];
+
+  // Each angle is emitted independently so a missing hand (common at the
+  // 9 o'clock back-pedal phase, where the forearm is often occluded) doesn't
+  // drop torso lean, which needs only shoulder + hip. `lateralAngle` is the
+  // lean of a segment from vertical (0° = straight down). Torso uses the band
+  // shared with the ride-video torsoAngle ([35,50]); Reach and the new
+  // Shoulder angle are informational (no band → 'unknown') pending calibration.
+  const out: FitMeasurement[] = [];
+  if (ls && lh)       out.push(entry('Torso Angle',    lateralAngle(ls, lh),                 '35–50°',  [35, 50]));
+  if (ls && le && lw) out.push(entry('Elbow Angle',    angleBetweenThreePoints(ls, le, lw),  '90–160°', [90, 160]));
+  if (ls && lw)       out.push(entry('Reach Angle',    lateralAngle(ls, lw),                 '—'));
+  if (lh && ls && le) out.push(entry('Shoulder Angle', angleBetweenThreePoints(lh, ls, le),  '—'));
+  return out;
+}
+
 export function measureSide6OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!wlm[L.LEFT_HIP] || !wlm[L.LEFT_KNEE] || !wlm[L.LEFT_ANKLE] ||
       !wlm[L.RIGHT_HIP] || !wlm[L.RIGHT_KNEE] || !wlm[L.RIGHT_ANKLE]) return [];
   return [
     entry('Knee Extension at BDC',     angle(wlm, L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE),    '145–155°', [145, 155]),
     entry('Knee Extension at BDC (R)', angle(wlm, L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE), '145–155°', [145, 155]),
+    ...sideUpperBody(wlm),
   ];
 }
 
@@ -66,37 +94,17 @@ export function measureSide3OClock(wlm: LandmarkArray): FitMeasurement[] {
   return [
     entry('Shank Angle (KOPS)',      lateralAngle(lk, la),                                 '0–2°',   [0, 2]),
     entry('Hip Angle at 3 o\'clock', angle(wlm, L.LEFT_SHOULDER, L.LEFT_HIP, L.LEFT_KNEE), '45–65°', [45, 65]),
+    ...sideUpperBody(wlm),
   ];
 }
 
 export function measureSide9OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!wlm[L.LEFT_KNEE] || !wlm[L.LEFT_HIP] || !wlm[L.LEFT_SHOULDER]) return [];
-  const backAngle = (() => {
-    const ls = wlm[L.LEFT_SHOULDER];
-    const lh = wlm[L.LEFT_HIP];
-    if (!ls || !lh) return 0;
-    const dx = ls.x - lh.x;
-    const dy = Math.abs(ls.y - lh.y);
-    return Math.abs((Math.atan2(Math.abs(dx), dy) * 180) / Math.PI);
-  })();
+  // Torso lean (formerly the standalone "Back Angle" here) now comes from
+  // sideUpperBody, so it's reported uniformly across all side positions.
   return [
     entry('Hip Extension at 9 o\'clock', angle(wlm, L.LEFT_KNEE, L.LEFT_HIP, L.LEFT_SHOULDER), '160–180°', [160, 180]),
-    entry('Back Angle',                  backAngle,                                            '35–50°',   [35, 50]),
-  ];
-}
-
-export function measureSideNeutral(wlm: LandmarkArray): FitMeasurement[] {
-  const ls = wlm[L.LEFT_SHOULDER];
-  const lh = wlm[L.LEFT_HIP];
-  const le = wlm[L.LEFT_ELBOW];
-  const lw = wlm[L.LEFT_WRIST];
-  if (!ls || !lh || !le || !lw) return [];
-
-  const torsoAngle = Math.abs((Math.atan2(Math.abs(ls.x - lh.x), Math.abs(ls.y - lh.y)) * 180) / Math.PI);
-
-  return [
-    entry('Torso Angle', torsoAngle,                                              '35–45°',  [35, 45]),
-    entry('Elbow Angle', angle(wlm, L.LEFT_SHOULDER, L.LEFT_ELBOW, L.LEFT_WRIST), '90–160°', [90, 160]),
+    ...sideUpperBody(wlm),
   ];
 }
 
@@ -130,15 +138,6 @@ export function measureRear6OClock(wlm: LandmarkArray): FitMeasurement[] {
   ];
 }
 
-export function measureRearNeutral(wlm: LandmarkArray): FitMeasurement[] {
-  const lh = wlm[L.LEFT_HIP];
-  const rh = wlm[L.RIGHT_HIP];
-  if (!lh || !rh) return [];
-  return [
-    entry('Pelvic Obliquity (neutral)', tiltFromHorizontal(lh, rh), '< 3°', [0, 3]),
-  ];
-}
-
 export function measureFront6OClock(wlm: LandmarkArray): FitMeasurement[] {
   const lh = wlm[L.LEFT_HIP];
   const rh = wlm[L.RIGHT_HIP];
@@ -151,25 +150,10 @@ export function measureFront6OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!lh || !rh || !lk || !rk || !la || !ra || !ls || !rs) return [];
 
   return [
-    entry('Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la), '< 5°', [0, 5]),
-    entry('Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra), '< 5°', [0, 5]),
-    entry('Shoulder Tilt',              tiltFromHorizontal(ls, rs),       '< 2°', [0, 2]),
-  ];
-}
-
-export function measureFrontNeutral(wlm: LandmarkArray): FitMeasurement[] {
-  const ls = wlm[L.LEFT_SHOULDER];
-  const rs = wlm[L.RIGHT_SHOULDER];
-  const lh = wlm[L.LEFT_HIP];
-  const rh = wlm[L.RIGHT_HIP];
-  if (!ls || !rs || !lh || !rh) return [];
-
-  const sMid = midpoint(ls, rs);
-  const hMid = midpoint(lh, rh);
-
-  return [
-    entry('Lateral Trunk Lean', lateralAngle(sMid, hMid),   '< 2°', [0, 2]),
-    entry('Shoulder Tilt',      tiltFromHorizontal(ls, rs), '< 2°', [0, 2]),
+    entry('Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la),                '< 5°', [0, 5]),
+    entry('Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra),                '< 5°', [0, 5]),
+    entry('Shoulder Tilt',              tiltFromHorizontal(ls, rs),                      '< 2°', [0, 2]),
+    entry('Lateral Trunk Lean',         lateralAngle(midpoint(ls, rs), midpoint(lh, rh)), '< 2°', [0, 2]),
   ];
 }
 
@@ -177,12 +161,9 @@ const POSITION_MEASURERS: Record<string, (wlm: LandmarkArray) => FitMeasurement[
   side_6oclock:  measureSide6OClock,
   side_3oclock:  measureSide3OClock,
   side_9oclock:  measureSide9OClock,
-  side_neutral:  measureSideNeutral,
   side_aero:     measureSideAero,
   rear_6oclock:  measureRear6OClock,
-  rear_neutral:  measureRearNeutral,
   front_6oclock: measureFront6OClock,
-  front_neutral: measureFrontNeutral,
 };
 
 export function measureFitPosition(positionId: string, worldLandmarks: LandmarkArray): FitMeasurement[] {

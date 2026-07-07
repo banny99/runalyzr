@@ -1,5 +1,5 @@
 import type { FrameData } from '@runalyzr/shared/types';
-import { angleBetweenThreePoints, midpoint } from '@runalyzr/shared/math';
+import { angleBetweenThreePoints, midpoint, lateralAngle } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../../config/defaults';
 import type { PedalEvent, PedalCycle, SagittalMetrics } from '../types';
 import { makeMetricResult } from '../thresholds';
@@ -125,6 +125,36 @@ export function calculateSagittalMetrics(
     return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : null;
   })();
 
+  // Shoulder angle — hip–shoulder–elbow (how open the arm is vs the torso),
+  // bilateral average across all frames (informational; no band yet).
+  const shoulderAngle = (() => {
+    const angles = frames.map((f) => {
+      const lh = f.worldLandmarks[L.LEFT_HIP];
+      const ls = f.worldLandmarks[L.LEFT_SHOULDER];
+      const le = f.worldLandmarks[L.LEFT_ELBOW];
+      const rh = f.worldLandmarks[L.RIGHT_HIP];
+      const rs = f.worldLandmarks[L.RIGHT_SHOULDER];
+      const re = f.worldLandmarks[L.RIGHT_ELBOW];
+      if (!lh || !ls || !le || !rh || !rs || !re) return null;
+      return (angleBetweenThreePoints(lh, ls, le) + angleBetweenThreePoints(rh, rs, re)) / 2;
+    }).filter((v): v is number => v !== null);
+    return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : null;
+  })();
+
+  // Reach angle — shoulder→wrist lean from vertical, bilateral average across
+  // all frames (informational; no band yet).
+  const reachAngle = (() => {
+    const angles = frames.map((f) => {
+      const ls = f.worldLandmarks[L.LEFT_SHOULDER];
+      const lw = f.worldLandmarks[L.LEFT_WRIST];
+      const rs = f.worldLandmarks[L.RIGHT_SHOULDER];
+      const rw = f.worldLandmarks[L.RIGHT_WRIST];
+      if (!ls || !lw || !rs || !rw) return null;
+      return (lateralAngle(ls, lw) + lateralAngle(rs, rw)) / 2;
+    }).filter((v): v is number => v !== null);
+    return angles.length > 0 ? angles.reduce((a, b) => a + b, 0) / angles.length : null;
+  })();
+
   // Wrist angle — elbow–wrist–midknuckle approximated as deviation from neutral
   const wristAngle = (() => {
     const angles = frames.map((f) => {
@@ -175,6 +205,8 @@ export function calculateSagittalMetrics(
     torsoAngle:             toResult(torsoAngle,     'torsoAngle'),
     pelvicTilt:             toResult(pelvicTilt,     'pelvicTilt'),
     elbowAngle:             toResult(elbowAngle,     'elbowAngle'),
+    shoulderAngle:          toResult(shoulderAngle,  'shoulderAngle'),
+    reachAngle:             toResult(reachAngle,     'reachAngle'),
     wristAngle:             toResult(wristAngle,     'wristAngle'),
     ankleAnkling:           toResult(ankleAnkling,   'ankleAnkling'),
     cadence:                cadenceValue > 0 ? makeMetricResult(cadenceValue, 'cadence') : null,

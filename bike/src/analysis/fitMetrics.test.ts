@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   measureRear6OClock,
-  measureRearNeutral,
   measureFront6OClock,
   measureSide3OClock,
+  sideUpperBody,
 } from './fitMetrics';
 import { LANDMARKS } from '../config/defaults';
 import type { LandmarkArray } from '@runalyzr/shared/types';
@@ -23,11 +23,16 @@ function world(overrides: Partial<Record<number, ReturnType<typeof lm>>> = {}): 
   return base;
 }
 
-// A symmetric rider: level hips/shoulders, legs tracking straight down.
+// A symmetric rider: level hips/shoulders, legs tracking straight down, arms
+// on the bars (elbow/wrist populated so upper-body angles are measurable).
 function symmetricRider(): LandmarkArray {
   return world({
     [L.LEFT_SHOULDER]:  lm(-0.2, -0.5),
     [L.RIGHT_SHOULDER]: lm(0.2, -0.5),
+    [L.LEFT_ELBOW]:     lm(0, -0.3),
+    [L.RIGHT_ELBOW]:    lm(0.4, -0.3),
+    [L.LEFT_WRIST]:     lm(0.1, -0.1),
+    [L.RIGHT_WRIST]:    lm(0.5, -0.1),
     [L.LEFT_HIP]:       lm(-0.1, 0),
     [L.RIGHT_HIP]:      lm(0.1, 0),
     [L.LEFT_KNEE]:      lm(-0.1, 0.4),
@@ -37,21 +42,56 @@ function symmetricRider(): LandmarkArray {
   });
 }
 
-describe('measureRearNeutral — pelvic obliquity', () => {
-  it('reports 0° for level hips', () => {
-    const result = measureRearNeutral(symmetricRider());
-    expect(result).toHaveLength(1);
-    expect(result[0].value).toBeCloseTo(0, 1);
-    expect(result[0].unit).toBe('°');
+describe('sideUpperBody — torso / elbow / reach / shoulder', () => {
+  // Clean left-side geometry with right-angle joints for exact expectations.
+  const sideRider = world({
+    [L.LEFT_SHOULDER]: lm(0, -0.5),
+    [L.LEFT_HIP]:      lm(0, 0),      // torso straight down → 0° from vertical
+    [L.LEFT_ELBOW]:    lm(0.5, -0.5), // shoulder→elbow→wrist right angle
+    [L.LEFT_WRIST]:    lm(0.5, 0),    // shoulder→wrist at 45° from vertical
   });
 
-  it('reports 45° when hip line rises as much as it spans', () => {
-    const wlm = world({
-      [L.LEFT_HIP]:  lm(-0.1, -0.1),
-      [L.RIGHT_HIP]: lm(0.1, 0.1),
-    });
-    const result = measureRearNeutral(wlm);
-    expect(result[0].value).toBeCloseTo(45, 1);
+  it('reports the four upper-body angles with expected values', () => {
+    const r = sideUpperBody(sideRider);
+    const by = (label: string) => r.find((m) => m.label === label)!;
+    expect(r.map((m) => m.label)).toEqual(['Torso Angle', 'Elbow Angle', 'Reach Angle', 'Shoulder Angle']);
+    expect(by('Torso Angle').value).toBeCloseTo(0, 1);
+    expect(by('Elbow Angle').value).toBeCloseTo(90, 1);
+    expect(by('Reach Angle').value).toBeCloseTo(45, 1);
+    expect(by('Shoulder Angle').value).toBeCloseTo(90, 1);
+  });
+
+  it('marks Torso/Elbow with a band status but Reach/Shoulder informational', () => {
+    const r = sideUpperBody(sideRider);
+    const by = (label: string) => r.find((m) => m.label === label)!;
+    expect(by('Torso Angle').status).not.toBe('unknown'); // has a band
+    expect(by('Reach Angle').status).toBe('unknown');     // informational
+    expect(by('Shoulder Angle').status).toBe('unknown');  // informational
+  });
+
+  it('still reports torso lean when the hand/elbow is occluded (shoulder+hip only)', () => {
+    // Sparse array: only shoulder + hip present, elbow/wrist absent (undefined),
+    // as happens when the near-side hand is occluded at 9 o'clock.
+    const wlm: LandmarkArray = [];
+    wlm[L.LEFT_SHOULDER] = lm(0, -0.5);
+    wlm[L.LEFT_HIP] = lm(0, 0);
+    const r = sideUpperBody(wlm);
+    expect(r.map((m) => m.label)).toEqual(['Torso Angle']);
+    expect(r[0].value).toBeCloseTo(0, 1);
+  });
+
+  it('returns [] when no upper-body landmarks are available', () => {
+    expect(sideUpperBody([])).toHaveLength(0);
+  });
+});
+
+describe('side crank positions include upper-body angles', () => {
+  it('measureSide3OClock now reports elbow/reach/shoulder alongside KOPS', () => {
+    const labels = measureSide3OClock(symmetricRider()).map((m) => m.label);
+    expect(labels).toContain('Shank Angle (KOPS)');
+    expect(labels).toContain('Elbow Angle');
+    expect(labels).toContain('Reach Angle');
+    expect(labels).toContain('Shoulder Angle');
   });
 });
 
@@ -85,6 +125,13 @@ describe('measureFront6OClock — shoulder tilt', () => {
     const result = measureFront6OClock(wlm);
     const shoulderTilt = result.find((m) => m.label === 'Shoulder Tilt')!;
     expect(shoulderTilt.value).toBeCloseTo(7.1, 1);
+  });
+
+  it('includes lateral trunk lean (0° when the trunk is centred)', () => {
+    const result = measureFront6OClock(symmetricRider());
+    const lean = result.find((m) => m.label === 'Lateral Trunk Lean');
+    expect(lean).toBeDefined();
+    expect(lean!.value).toBeCloseTo(0, 1);
   });
 });
 
