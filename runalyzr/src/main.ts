@@ -257,6 +257,9 @@ async function main() {
   });
   cameraCloseBtn?.addEventListener('click', () => {
     analysing = false;
+    // Re-enable the loadedmetadata → showVideoFileUI path; without this an
+    // upload after any camera open/close is silently ignored (issue #11).
+    cameraActive = false;
     cameraController.close();
     showIdleUI();
   });
