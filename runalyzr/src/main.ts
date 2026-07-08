@@ -143,6 +143,25 @@ async function main() {
     updateLiveMetrics(null, detectCameraView(landmarks), loop.getFps());
   });
 
+  // Runs BEFORE initVideoPlayer's change listener (registration order): if the
+  // camera is open when a file is picked, close it first so the live stream's
+  // srcObject doesn't swallow the upload and close() doesn't wipe the new src
+  // (issue #12). Also retire the Share button — it shares the previous
+  // recording, not this upload.
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files?.length) {
+      if (cameraActive) {
+        cameraActive = false;
+        cameraController.close();
+      }
+      // Cancel any in-flight silent analysis — videoPlayer's loader is about to
+      // video.load(), whose 'emptied' event the seek loop treats as a completed
+      // seek; without this it would keep analysing across two different videos.
+      analysing = false;
+      shareVideoBtn.style.display = 'none';
+    }
+  });
+
   // keydown cleanup — call this if video player is ever torn down (see Task 10)
   const cleanupVideoPlayer = initVideoPlayer(video, fileInput, {
     onLoadedMetadata: () => {
@@ -156,6 +175,7 @@ async function main() {
       const lm = loop.getCurrentLandmarks();
       if (lm) overlay.drawSkeleton(lm, lastResults ? buildJointStatuses(lastResults) : {});
     },
+    isBusy: () => analysing,
   });
   void cleanupVideoPlayer;
 
@@ -280,54 +300,93 @@ async function main() {
 
     video.pause();
 
-    const duration = video.duration;
+    const seekSettled = () => new Promise<void>((resolve) => {
+      const done = () => {
+        video.removeEventListener('seeked',  done);
+        video.removeEventListener('abort',   done);
+        video.removeEventListener('emptied', done);
+        resolve();
+      };
+      video.addEventListener('seeked',  done, { once: true });
+      video.addEventListener('abort',   done, { once: true });
+      video.addEventListener('emptied', done, { once: true });
+    });
+
+    let duration = video.duration;
+    if (duration === Infinity) {
+      // Chrome MediaRecorder WebM quirk: recorded blobs report Infinity until
+      // the element is seeked past the end, which forces duration resolution.
+      duration = await new Promise<number>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          video.removeEventListener('durationchange', onDurationChange);
+          resolve(NaN);
+        }, 3000);
+        const onDurationChange = () => {
+          if (Number.isFinite(video.duration)) {
+            clearTimeout(timeout);
+            video.removeEventListener('durationchange', onDurationChange);
+            resolve(video.duration);
+          }
+        };
+        video.addEventListener('durationchange', onDurationChange);
+        video.currentTime = Number.MAX_SAFE_INTEGER;
+      });
+      video.currentTime = 0;
+      // Let the reset seek settle: a stale 'seeked' from the end-probe must not
+      // resolve the loop's first await while the end frame is still displayed.
+      await seekSettled();
+    }
     if (!Number.isFinite(duration) || duration <= 0) {
       overlayEl.style.display = 'none';
       analyseBtn.disabled = false;
       analysing = false;
+      showAnalysisWarning('Could not determine the video duration — try re-recording or uploading the file again.');
       return;
     }
     const step     = 1 / 30;
     const frames: FrameData[] = [];
+    let completed = false;
 
-    for (let t = 0; t <= duration; t += step) {
-      if (!analysing) break;
+    try {
+      for (let t = 0; t <= duration; t += step) {
+        if (!analysing) break;
 
-      video.currentTime = t;
-      await new Promise<void>((resolve) => {
-        const done = () => {
-          video.removeEventListener('seeked',  done);
-          video.removeEventListener('abort',   done);
-          video.removeEventListener('emptied', done);
-          resolve();
-        };
-        video.addEventListener('seeked',  done, { once: true });
-        video.addEventListener('abort',   done, { once: true });
-        video.addEventListener('emptied', done, { once: true });
-      });
+        video.currentTime = t;
+        await seekSettled();
 
-      if (!analysing) break;
+        if (!analysing) break;
 
-      const result = landmarker.detectForVideo(video, Math.round(t * 1000));
+        // MediaPipe VIDEO mode requires monotonically increasing timestamps per
+        // landmarker instance. The camera loop and processing loop both stamp
+        // with the performance.now() clock, so use it here too — a 0-based clock
+        // would regress after camera use (or on a second Analyse) and make
+        // MediaPipe reject the frame. Video time still goes into FrameData
+        // below, where cadence/duration math needs it.
+        const result = landmarker.detectForVideo(video, performance.now());
 
-      if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
-        frames.push({
-          landmarks:      result.landmarks[0]      as LandmarkArray,
-          worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
-          timestamp:      t * 1000,
-        });
+        if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
+          frames.push({
+            landmarks:      result.landmarks[0]      as LandmarkArray,
+            worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
+            timestamp:      t * 1000,
+          });
+        }
+
+        const pct = Math.min(100, Math.round((t / duration) * 100));
+        pctEl.textContent = `Analysing… ${pct}%`;
       }
-
-      const pct = Math.min(100, Math.round((t / duration) * 100));
-      pctEl.textContent = `Analysing… ${pct}%`;
+      completed = analysing;
+    } finally {
+      // Always restore UI state — a mid-loop throw (e.g. MediaPipe rejecting a
+      // source that was emptied by a new upload) must not leave the overlay
+      // stuck, the Analyse button disabled, and isBusy() eating the keyboard.
+      analysing = false;
+      overlayEl.style.display = 'none';
+      analyseBtn.disabled = false;
     }
 
-    overlayEl.style.display = 'none';
-    analyseBtn.disabled = false;
+    if (!completed) return;
 
-    if (!analysing) return;
-
-    analysing = false;
     runAnalysis(frames);
     if (window.innerWidth < 768) switchTab('results');
   }

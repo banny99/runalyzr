@@ -69,7 +69,11 @@ export function initCameraController(deps: CameraControllerDeps) {
   let compositeCtx: CanvasRenderingContext2D | null = null;
   let recordingHasOverlay = false;
   let mediaRecorder: MediaRecorder | null = null;
-  const recordedChunks: Blob[] = [];
+  // Reassigned (never cleared in place) per recording: the active recorder's
+  // handlers capture THEIR array in closure, so a close() during MediaRecorder's
+  // async finalization can't wipe a committed recording's chunks, and an
+  // orphaned recorder's late chunks can't leak into the next recording.
+  let recordedChunks: Blob[] = [];
   const cameraFrames: FrameData[] = [];
 
   const L = LANDMARKS;
@@ -169,7 +173,7 @@ export function initCameraController(deps: CameraControllerDeps) {
   function startRecording(): void {
     cameraState = 'recording';
     cameraFrames.length = 0;
-    recordedChunks.length = 0;
+    recordedChunks = [];
     recordBtn.classList.remove('ready');
     recordBtn.classList.add('recording');
     recordBtn.disabled = true;
@@ -215,7 +219,8 @@ export function initCameraController(deps: CameraControllerDeps) {
       try {
         if (stream) {
           mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-          mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+          const chunks = recordedChunks; // this recording's own array (see decl)
+          mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
           mediaRecorder.start(100);
           recordingHasOverlay = canCaptureStream;
         }
@@ -258,16 +263,16 @@ export function initCameraController(deps: CameraControllerDeps) {
     };
 
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      const chunks = recordedChunks; // snapshot ref: close() can't wipe it
       mediaRecorder.onstop = () => {
-        const blob = recordedChunks.length > 0
-          ? new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' })
+        const blob = chunks.length > 0
+          ? new Blob(chunks, { type: chunks[0]?.type || 'video/webm' })
           : null;
         const blobUrl = blob ? URL.createObjectURL(blob) : null;
         if (blobUrl) {
           if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
           recordedBlobUrl = blobUrl;
-          video.src = blobUrl;
-          video.load();
+          video.src = blobUrl; // assigning src runs the load algorithm itself
           shareVideoBtn.style.display = 'flex';
         }
         finalize(blobUrl);
@@ -388,6 +393,18 @@ export function initCameraController(deps: CameraControllerDeps) {
       cancelAnimationFrame(cameraRafId);
       recordBtn.disabled = false;
       clearInterval(recTimerInterval);
+      // Stop any in-flight recorder and discard its chunks — otherwise the
+      // orphaned recorder keeps feeding the shared recordedChunks array and
+      // its stale data interleaves into the NEXT recording's blob (issue #12).
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+      }
+      mediaRecorder = null;
+      compositeCanvas = null;
+      compositeCtx = null;
+      recordedChunks = []; // fresh array — pending onstop closures keep theirs
       stopCamera(video);
       recordBtn.classList.remove('ready', 'recording');
       viewModeBtn.style.display = 'none';

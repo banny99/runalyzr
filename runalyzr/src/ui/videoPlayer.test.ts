@@ -82,6 +82,19 @@ describe('initVideoPlayer — playback controls', () => {
     expect(pause).not.toHaveBeenCalled();
   });
 
+  it('arrow keys are ignored while the app reports busy (silent analysis seek loop)', () => {
+    cleanup(); // replace the beforeEach instance with one that reports busy
+    let busy = true;
+    cleanup = initVideoPlayer(video, fileInput, { ...noopCallbacks, isBusy: () => busy });
+    const pause = vi.spyOn(video, 'pause').mockImplementation(() => {});
+    Object.defineProperty(video, 'duration', { configurable: true, value: 10 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(pause).not.toHaveBeenCalled();
+    busy = false;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(pause).toHaveBeenCalled();
+  });
+
   it('cleanup removes the keydown handler', () => {
     const pause = vi.spyOn(video, 'pause').mockImplementation(() => {});
     cleanup();
