@@ -393,13 +393,17 @@ export function initCameraController(deps: CameraControllerDeps) {
       compositeCanvas = null;
       compositeCtx = null;
       recordedChunks = []; // fresh array — pending onstop closures keep theirs
+      if (wasRecording) {
+        // Analyse BEFORE stopping the camera (mirrors stopRecording): the
+        // report-frame capture reads the video element, and stopCamera blanks
+        // it (videoWidth 0 / dead frame → missing or black report image).
+        onAnalysisReady([...cameraFrames], selectedView);
+      }
       stopCamera(video);
       recordBtn.classList.remove('ready', 'recording');
       viewModeBtn.style.display = 'none';
       recIndicator.style.display = 'none';
-      if (wasRecording) {
-        onAnalysisReady([...cameraFrames], selectedView);
-      } else {
+      if (!wasRecording) {
         if (recordedBlobUrl) {
           URL.revokeObjectURL(recordedBlobUrl);
           recordedBlobUrl = null;

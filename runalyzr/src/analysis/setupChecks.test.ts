@@ -94,11 +94,21 @@ describe('evaluateVideoQuality', () => {
     expect(evaluateVideoQuality(frames, 'sagittal')).toHaveLength(0);
   });
 
-  it('warns when a third of the video has the subject out of frame', () => {
+  it('warns when more than 30 % of sampled frames have the subject out of frame', () => {
+    // evaluateVideoQuality samples every 10th frame (0,10,20,30,40); making
+    // frames bad at i % 20 === 0 puts 3 of the 5 samples (60 %) over the
+    // 30 % threshold without being all-bad.
     const outOfFrame = goodSagittal({ [L.LEFT_ANKLE]: lm(0.5, 0.999), [L.RIGHT_ANKLE]: lm(0.52, 0.999) });
-    const frames = Array(50).fill(null).map((_, i) => frame(i % 2 === 0 ? outOfFrame : goodSagittal(), i));
+    const frames = Array(50).fill(null).map((_, i) => frame(i % 20 === 0 ? outOfFrame : goodSagittal(), i));
     const warnings = evaluateVideoQuality(frames, 'sagittal');
     expect(warnings.some((w) => w.includes('not fully in frame'))).toBe(true);
+  });
+
+  it('stays quiet when only a small fraction of sampled frames are bad', () => {
+    // Only sample index 0 is bad → 1 of 5 (20 %) is under the 30 % threshold.
+    const outOfFrame = goodSagittal({ [L.LEFT_ANKLE]: lm(0.5, 0.999), [L.RIGHT_ANKLE]: lm(0.52, 0.999) });
+    const frames = Array(50).fill(null).map((_, i) => frame(i === 0 ? outOfFrame : goodSagittal(), i));
+    expect(evaluateVideoQuality(frames, 'sagittal')).toHaveLength(0);
   });
 
   it('returns empty for an empty video', () => {

@@ -13,6 +13,33 @@ import { LANDMARKS, POSE_CONNECTIONS, OVERLAY_COLORS } from './config/defaults';
 import type { LandmarkArray, AnalysisResults, FrameData, CameraView } from './analysis/types';
 import { initCameraController } from './ui/cameraController';
 
+// Draws the pose skeleton onto an arbitrary context at the given pixel size.
+// Visibility-gated on both connection endpoints and dots, matching the live
+// overlay. Slightly heavier stroke/radius than the on-screen overlay because
+// this renders at native video resolution for the PDF. Candidate for the
+// shared skeleton drawer planned in issue #14 part 2.
+function drawSkeletonInto(cx: CanvasRenderingContext2D, lms: LandmarkArray, w: number, h: number): void {
+  const visible = (l: LandmarkArray[number] | undefined) => !!l && (l.visibility ?? 1) >= 0.4;
+  cx.lineWidth = 3;
+  cx.strokeStyle = OVERLAY_COLORS.neutral;
+  cx.fillStyle = OVERLAY_COLORS.neutral;
+  for (const [a, b] of POSE_CONNECTIONS) {
+    const la = lms[a];
+    const lb = lms[b];
+    if (!visible(la) || !visible(lb)) continue;
+    cx.beginPath();
+    cx.moveTo(la.x * w, la.y * h);
+    cx.lineTo(lb.x * w, lb.y * h);
+    cx.stroke();
+  }
+  for (const l of lms) {
+    if (!visible(l)) continue;
+    cx.beginPath();
+    cx.arc(l.x * w, l.y * h, 5, 0, Math.PI * 2);
+    cx.fill();
+  }
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -89,30 +116,15 @@ async function main() {
   // upload flow where the overlay was never drawn. JPEG because the shared PDF
   // renderer embeds with the JPEG codec.
   function captureAnnotatedFrame(lms: LandmarkArray): { dataUrl: string; aspect: number } | null {
-    if (!video.videoWidth || !video.videoHeight) return null;
+    // readyState < 2: no decoded frame — drawImage would silently no-op and
+    // produce a black frame (e.g. right after the camera stream is stopped).
+    if (!video.videoWidth || !video.videoHeight || video.readyState < 2) return null;
     const c = document.createElement('canvas');
     c.width = video.videoWidth;
     c.height = video.videoHeight;
     const cx = c.getContext('2d')!;
     cx.drawImage(video, 0, 0, c.width, c.height);
-    cx.lineWidth = 3;
-    cx.strokeStyle = OVERLAY_COLORS.neutral;
-    cx.fillStyle = OVERLAY_COLORS.neutral;
-    for (const [a, b] of POSE_CONNECTIONS) {
-      const la = lms[a];
-      const lb = lms[b];
-      if (!la || !lb) continue;
-      cx.beginPath();
-      cx.moveTo(la.x * c.width, la.y * c.height);
-      cx.lineTo(lb.x * c.width, lb.y * c.height);
-      cx.stroke();
-    }
-    for (const l of lms) {
-      if (!l || (l.visibility ?? 1) < 0.4) continue;
-      cx.beginPath();
-      cx.arc(l.x * c.width, l.y * c.height, 5, 0, Math.PI * 2);
-      cx.fill();
-    }
+    drawSkeletonInto(cx, lms, c.width, c.height);
     return { dataUrl: c.toDataURL('image/jpeg', 0.85), aspect: c.width / c.height };
   }
 
@@ -124,6 +136,10 @@ async function main() {
       showAnalysisWarning('Not enough footage to analyse — record at least 5 seconds of running.');
       return;
     }
+    // View-selector re-runs pass the same frames array back in; the video may
+    // have been scrubbed since, so recapturing would composite the current
+    // frame with end-of-video landmarks (misaligned skeleton in the PDF).
+    const isRerun = frames === lastFrames;
     lastFrames = frames;
     const durationSec = (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000;
     const fps  = frames.length / durationSec;
@@ -134,9 +150,11 @@ async function main() {
     const results    = calculateAllMetrics(frames, gaitEvents, gaitCycles, fps, view);
     const findings   = generateFindings(results);
     lastResults = results;
-    const captured = captureAnnotatedFrame(frames[frames.length - 1].landmarks);
-    lastAnalysisFrameUrl    = captured?.dataUrl ?? null;
-    lastAnalysisFrameAspect = captured?.aspect ?? null;
+    if (!isRerun) {
+      const captured = captureAnnotatedFrame(frames[frames.length - 1].landmarks);
+      lastAnalysisFrameUrl    = captured?.dataUrl ?? null;
+      lastAnalysisFrameAspect = captured?.aspect ?? null;
+    }
     renderDashboard(results, findings, view);
     renderViewSelector(
       detectedView,

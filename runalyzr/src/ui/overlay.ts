@@ -14,7 +14,6 @@ export interface OverlayController {
   syncSize: () => void;
   syncSizeIfReady: () => void;
   setVisible: (visible: boolean) => void;
-  captureDataUrl: () => string;
 }
 
 export function initOverlay(
@@ -137,6 +136,5 @@ export function initOverlay(
       visible = v;
       if (!v) clear();
     },
-    captureDataUrl: () => canvas.toDataURL('image/png'),
   };
 }
