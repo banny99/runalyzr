@@ -1,8 +1,9 @@
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
-import type { FrameData, CameraView, AnalysisResults, MetricStatus } from '../analysis/types';
+import type { FrameData, CameraView, AnalysisResults } from '../analysis/types';
 import { LANDMARKS } from '../config/defaults';
 import { detectCameraView } from '../pose/processing';
 import { evaluateSetupChecks } from '../analysis/setupChecks';
+import { buildJointStatuses } from '../analysis/jointStatuses';
 import { angleBetweenThreePoints } from '../analysis/angles';
 import { startCamera, stopCamera } from './videoPlayer';
 import type { initOverlay } from './overlay';
@@ -292,20 +293,7 @@ export function initCameraController(deps: CameraControllerDeps) {
         const lms = result.landmarks[0];
         lastLandmarkTime = performance.now();
         const lastResults = getLastResults();
-        const statuses: Partial<Record<number, MetricStatus>> = {};
-        if (lastResults) {
-          const set = (indices: number[], status: MetricStatus) =>
-            indices.forEach((i) => { statuses[i] = status; });
-          if (lastResults.kneeFlexionAtContact)
-            set([L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE, L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE],
-              lastResults.kneeFlexionAtContact.status);
-          if (lastResults.pelvicDrop)
-            set([L.LEFT_HIP, L.RIGHT_HIP], lastResults.pelvicDrop.status);
-          if (lastResults.trunkLateralLean)
-            set([L.LEFT_SHOULDER, L.RIGHT_SHOULDER, L.LEFT_HIP, L.RIGHT_HIP],
-              lastResults.trunkLateralLean.status);
-        }
-        overlay.drawSkeleton(lms, statuses);
+        overlay.drawSkeleton(lms, lastResults ? buildJointStatuses(lastResults) : {});
 
         if (cameraState === 'setup') {
           setupConsecutiveFrames++;

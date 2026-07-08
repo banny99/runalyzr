@@ -48,4 +48,5 @@ export interface ReportParams {
   metrics: AnalysisResults;
   findings: FindingItem[];
   frameDataUrl: string | null;
+  frameAspect: number | null;  // width / height — needed for PDF layout
 }

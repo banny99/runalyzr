@@ -103,23 +103,6 @@ function createMetricCard(key: string, result: MetricResult | null, enabled: boo
   return card;
 }
 
-export function renderViewSelector(
-  availableViews: Array<'sagittal' | 'rear' | 'front'>,
-  currentView: 'sagittal' | 'rear' | 'front' | null,
-  onSelect: (v: 'sagittal' | 'rear' | 'front') => void,
-  containerEl: HTMLElement,
-): void {
-  containerEl.innerHTML = '';
-  const labels: Record<string, string> = { sagittal: 'Side', rear: 'Rear', front: 'Front' };
-  for (const view of availableViews) {
-    const btn = document.createElement('button');
-    btn.className = `view-tab${view === currentView ? ' active' : ''}`;
-    btn.textContent = labels[view] ?? view;
-    btn.addEventListener('click', () => onSelect(view));
-    containerEl.appendChild(btn);
-  }
-}
-
 export function showAnalysisWarning(msg: string, containerEl: HTMLElement): void {
   const el = document.createElement('div');
   el.className = 'analysis-warning';
