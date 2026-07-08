@@ -18,6 +18,9 @@ export interface GaitCycle {
   endFrame: number;
   footstrikeFrame: number;
   toeOffFrame: number;
+  /** True when no toe-off was detected and toeOffFrame is the 40 %-of-cycle
+   *  fallback — an estimate, not a measurement. */
+  toeOffEstimated: boolean;
 }
 
 export interface AnalysisResults {

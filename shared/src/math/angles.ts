@@ -21,6 +21,11 @@ export function lateralAngle(top: Landmark, bottom: Landmark): number {
   return Math.abs((Math.atan2(dx, dy) * 180) / Math.PI);
 }
 
+/** Tilt of the line a–b away from horizontal, in degrees (0° = level). */
+export function tiltFromHorizontal(a: Landmark, b: Landmark): number {
+  return (Math.atan2(Math.abs(a.y - b.y), Math.abs(a.x - b.x)) * 180) / Math.PI;
+}
+
 export function midpoint(a: Landmark, b: Landmark): Landmark {
   return {
     x: (a.x + b.x) / 2,

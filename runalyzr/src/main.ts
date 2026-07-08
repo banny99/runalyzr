@@ -126,6 +126,11 @@ async function main() {
     const safeView: 'sagittal' | 'frontal' | null =
       (view === 'sagittal' || view === 'frontal') ? view : null;
     const qualityWarnings = evaluateVideoQuality(frames, safeView);
+    if (view === 'unknown') {
+      // Metrics assume a side view in this case (frontal metrics from an
+      // unidentified view would be meaningless) — tell the user how to fix it.
+      qualityWarnings.unshift('Camera view could not be detected — assuming side view. Use the view buttons above to correct this.');
+    }
     if (qualityWarnings.length > 0) showQualityWarning(qualityWarnings);
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
   }

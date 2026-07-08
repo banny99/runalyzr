@@ -28,8 +28,8 @@ const FINDING_TEMPLATES: Partial<Record<keyof AnalysisResults, FindingTemplate>>
     amber: 'Cadence of {value} spm is slightly low. A minor increase may reduce injury risk.',
   },
   verticalOscillation: {
-    red: 'Vertical oscillation of {value} cm is excessive, representing wasted energy. Focus on running along the ground with reduced up-and-down movement.',
-    amber: 'Vertical oscillation of {value} cm is slightly above optimal.',
+    red: 'Vertical oscillation of {value}% of frame height is excessive, representing wasted energy. Focus on running along the ground with reduced up-and-down movement.',
+    amber: 'Vertical oscillation of {value}% of frame height is slightly above optimal.',
   },
   overstriding: {
     red: 'Significant overstriding detected ({value} cm ahead of centre of mass at contact). This increases braking forces and injury risk. Land closer to your centre of mass.',

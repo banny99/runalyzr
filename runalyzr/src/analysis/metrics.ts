@@ -3,7 +3,7 @@ import type {
   MetricResult, CameraView, Foot,
 } from './types';
 import { LANDMARKS } from '../config/defaults';
-import { angleBetweenThreePoints, lateralAngle, midpoint } from './angles';
+import { angleBetweenThreePoints, lateralAngle, tiltFromHorizontal, midpoint } from './angles';
 import { makeMetricResult } from './thresholds';
 
 export function calculateKneeFlexionAtContact(
@@ -77,13 +77,16 @@ export function calculatePelvicDrop(
   const footstrikes = events.filter((e) => e.type === 'footstrike');
   if (footstrikes.length < 2) return null;
 
+  // Hip-line tilt from horizontal in degrees — thresholds and finding text
+  // band this metric in degrees, so the computation must be an angle too
+  // (previously it returned a linear cm drop mislabelled as degrees).
   const drops = footstrikes
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
     .map((f) => {
       const lh = f.worldLandmarks[LANDMARKS.LEFT_HIP];
       const rh = f.worldLandmarks[LANDMARKS.RIGHT_HIP];
-      return Math.abs(lh.y - rh.y) * 100;
+      return tiltFromHorizontal(lh, rh);
     });
   return drops.reduce((a, b) => a + b, 0) / drops.length;
 }
@@ -169,8 +172,12 @@ export function calculateGroundContactTime(
   cycles: GaitCycle[],
   fps: number,
 ): number | null {
-  if (cycles.length === 0) return null;
-  const times = cycles.map((c) => ((c.toeOffFrame - c.footstrikeFrame) / fps) * 1000);
+  // Only cycles with a *detected* toe-off count: the estimated fallback pins
+  // toe-off at 40 % of the cycle, which would make GCT 40 % of cycle time by
+  // construction — a fabricated number, not a measurement.
+  const measured = cycles.filter((c) => !c.toeOffEstimated);
+  if (measured.length === 0) return null;
+  const times = measured.map((c) => ((c.toeOffFrame - c.footstrikeFrame) / fps) * 1000);
   return times.reduce((a, b) => a + b, 0) / times.length;
 }
 
@@ -193,8 +200,12 @@ export function calculateAllMetrics(
   fps: number,
   cameraView: CameraView,
 ): AnalysisResults {
+  // An unknown view is treated as sagittal (the primary capture mode) rather
+  // than computing BOTH sets — frontal metrics derived from a side view are
+  // geometrically meaningless. The dashboard's view selector lets the user
+  // correct a wrong assumption; runAnalysis warns when the view is unknown.
   const isSagittal = cameraView === 'sagittal' || cameraView === 'unknown';
-  const isFrontal = cameraView === 'frontal' || cameraView === 'unknown';
+  const isFrontal = cameraView === 'frontal';
 
   const leftKnee = isSagittal ? calculateKneeFlexionAtContact(frames, events, 'left') : null;
   const rightKnee = isSagittal ? calculateKneeFlexionAtContact(frames, events, 'right') : null;

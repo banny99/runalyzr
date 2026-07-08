@@ -1,1 +1,1 @@
-export { angleBetweenThreePoints, lateralAngle, midpoint, verticalDisplacement, lateralDisplacement } from '@runalyzr/shared/math';
+export { angleBetweenThreePoints, lateralAngle, tiltFromHorizontal, midpoint, verticalDisplacement, lateralDisplacement } from '@runalyzr/shared/math';
