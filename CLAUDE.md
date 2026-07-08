@@ -18,13 +18,16 @@ Always `cd` into the workspace first — there is no root-level build or test co
 # runalyzr
 cd runalyzr && npm run build      # Vite build
 cd runalyzr && npm run dev        # Dev server
-cd runalyzr && npm test           # 46 Vitest tests
+cd runalyzr && npm test           # 59 Vitest tests
 
 # bike
 cd bike && npm run build          # Vite build
 cd bike && npm run dev            # Dev server
-cd bike && npm test               # 64 Vitest tests
+cd bike && npm test               # 60 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
+
+# shared
+cd shared && npm test             # 4 Vitest tests (setRunningMode)
 ```
 
 ## Module Resolution
@@ -112,13 +115,14 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 
 | File | Tests | What's covered |
 |------|-------|----------------|
-| `runalyzr/src/analysis/*.test.ts` | 38 | Gait detection (incl. estimated toe-off), metrics (incl. pelvic-drop degrees, GCT honesty, view gating), thresholds, findings, angles (setup checks NOT covered — see issue #14) |
+| `runalyzr/src/analysis/*.test.ts` | 48 | Gait detection (incl. estimated toe-off), metrics (incl. pelvic-drop degrees, GCT honesty, view gating), thresholds, findings, angles, setup checks + video quality |
+| `runalyzr/src/report/pdfGenerator.test.ts` | 3 | buildReportSections rows/ranges/findings + annotated-frame image |
 | `runalyzr/src/ui/videoPlayer.test.ts` | 8 | Play/pause wiring, keydown guards (inputs, live camera, isBusy), cleanup, startCamera src-clearing (jsdom) |
 | `bike/src/analysis/pedalDetection.test.ts` | 7 | BDC/TDC detection, cadence, cycle segmentation |
 | `bike/src/analysis/metrics.test.ts` | 5 | hipRock, kneeSymmetry |
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
 | `bike/src/analysis/fitMetrics.test.ts` | 12 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) + per-position upper-body angles (`sideUpperBody`, incl. graceful degradation) and front lateral trunk lean |
-| `bike/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup |
+| `shared/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup (lives with the code it tests) |
 | `bike/src/analysis/bikeGeometryMetrics.test.ts` | 14 | computeBikeAngles (signed/unsigned/3-point, aspect scaling, band status), anglePointPairs |
 | `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
 | `bike/src/analysis/bands.test.ts` | 4 | bandStatus green/amber/unknown evaluation |

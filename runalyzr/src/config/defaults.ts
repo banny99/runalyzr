@@ -56,9 +56,6 @@ export const APP_NAME = 'Runalyzr';
 
 export const MEDIAPIPE_CDN = `${import.meta.env.BASE_URL}wasm`;
 
-export const LITE_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
-
 export const HEAVY_MODEL_URL = `${import.meta.env.BASE_URL}models/pose_landmarker_heavy.task`;
 
 export const FPS_TARGET = 30;

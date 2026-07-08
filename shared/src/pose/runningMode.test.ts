@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { setRunningMode } from '@runalyzr/shared/pose';
+import { setRunningMode } from './landmarker';
 
 function makeLandmarkerStub() {
   return { setOptions: vi.fn(() => Promise.resolve()) };

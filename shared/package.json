@@ -3,12 +3,18 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./math":  "./src/math/angles.ts",
+    "./math": "./src/math/angles.ts",
     "./types": "./src/types/index.ts",
-    "./pose":  "./src/pose/landmarker.ts",
-    "./pdf":   "./src/pdf/renderer.ts"
+    "./pose": "./src/pose/landmarker.ts",
+    "./pdf": "./src/pdf/renderer.ts"
   },
   "peerDependencies": {
     "@mediapipe/tasks-vision": "*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.8"
   }
 }

@@ -1,11 +1,11 @@
 import { generateReport as _generateReport } from '@runalyzr/shared/pdf';
+import type { ReportSection } from '@runalyzr/shared/types';
 import { METRIC_LABELS, APP_NAME } from '../config/defaults';
 import { THRESHOLDS } from '../analysis/thresholds';
 import type { ReportParams, AnalysisResults } from '../analysis/types';
-import type { MetricResult } from '@runalyzr/shared/types';
 
-export function generateReport(params: ReportParams): void {
-  const metrics: Array<{ label: string; result: MetricResult; normalRange?: string }> = [];
+export function buildReportSections(params: ReportParams): ReportSection[] {
+  const metrics: ReportSection['metrics'] = [];
 
   for (const [key, result] of Object.entries(params.metrics) as [keyof AnalysisResults, typeof params.metrics[keyof AnalysisResults]][]) {
     if (!result) continue;
@@ -17,14 +17,22 @@ export function generateReport(params: ReportParams): void {
     metrics.push({ label, result, normalRange });
   }
 
-  _generateReport(
-    [{ title: 'Gait Metrics', metrics, findings: params.findings.map((f) => f.text) }],
-    {
-      title: 'Running Gait Analysis Report',
-      appName: APP_NAME,
-      clientName: params.clientName,
-      notes: params.notes,
-      date: new Date().toLocaleDateString(),
-    },
-  );
+  return [{
+    title: 'Gait Metrics',
+    metrics,
+    findings: params.findings.map((f) => f.text),
+    ...(params.frameDataUrl && params.frameAspect
+      ? { image: { dataUrl: params.frameDataUrl, aspectRatio: params.frameAspect } }
+      : {}),
+  }];
+}
+
+export function generateReport(params: ReportParams): void {
+  _generateReport(buildReportSections(params), {
+    title: 'Running Gait Analysis Report',
+    appName: APP_NAME,
+    clientName: params.clientName,
+    notes: params.notes,
+    date: new Date().toLocaleDateString(),
+  });
 }

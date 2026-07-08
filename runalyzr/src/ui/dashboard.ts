@@ -25,7 +25,7 @@ export function renderDashboard(
     document.getElementById('export-pdf-phone')?.removeAttribute('disabled');
 }
 
-export function renderSummaryCards(results: AnalysisResults, view: CameraView): void {
+function renderSummaryCards(results: AnalysisResults, view: CameraView): void {
     const container = document.getElementById('summary-cards');
     if (!container) return;
     container.innerHTML = '';
@@ -49,7 +49,7 @@ export function renderSummaryCards(results: AnalysisResults, view: CameraView): 
     }
 }
 
-export function renderFindings(findings: FindingItem[]): void {
+function renderFindings(findings: FindingItem[]): void {
     const container = document.getElementById('findings-list');
     if (!container) return;
     container.innerHTML = '';

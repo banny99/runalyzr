@@ -8,9 +8,37 @@ import { angleBetweenThreePoints } from './analysis/angles';
 import { detectGaitEvents, segmentGaitCycles } from './analysis/gaitDetection';
 import { calculateAllMetrics } from './analysis/metrics';
 import { generateFindings } from './analysis/findings';
-import { LANDMARKS } from './config/defaults';
-import type { LandmarkArray, AnalysisResults, MetricStatus, FrameData, CameraView } from './analysis/types';
+import { buildJointStatuses } from './analysis/jointStatuses';
+import { LANDMARKS, POSE_CONNECTIONS, OVERLAY_COLORS } from './config/defaults';
+import type { LandmarkArray, AnalysisResults, FrameData, CameraView } from './analysis/types';
 import { initCameraController } from './ui/cameraController';
+
+// Draws the pose skeleton onto an arbitrary context at the given pixel size.
+// Visibility-gated on both connection endpoints and dots, matching the live
+// overlay. Slightly heavier stroke/radius than the on-screen overlay because
+// this renders at native video resolution for the PDF. Candidate for the
+// shared skeleton drawer planned in issue #14 part 2.
+function drawSkeletonInto(cx: CanvasRenderingContext2D, lms: LandmarkArray, w: number, h: number): void {
+  const visible = (l: LandmarkArray[number] | undefined) => !!l && (l.visibility ?? 1) >= 0.4;
+  cx.lineWidth = 3;
+  cx.strokeStyle = OVERLAY_COLORS.neutral;
+  cx.fillStyle = OVERLAY_COLORS.neutral;
+  for (const [a, b] of POSE_CONNECTIONS) {
+    const la = lms[a];
+    const lb = lms[b];
+    if (!visible(la) || !visible(lb)) continue;
+    cx.beginPath();
+    cx.moveTo(la.x * w, la.y * h);
+    cx.lineTo(lb.x * w, lb.y * h);
+    cx.stroke();
+  }
+  for (const l of lms) {
+    if (!visible(l)) continue;
+    cx.beginPath();
+    cx.arc(l.x * w, l.y * h, 5, 0, Math.PI * 2);
+    cx.fill();
+  }
+}
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -78,23 +106,26 @@ async function main() {
   const overlay = initOverlay(canvas, video);
   let lastResults: AnalysisResults | null = null;
   let lastAnalysisFrameUrl: string | null = null;
+  let lastAnalysisFrameAspect: number | null = null;
   let lastFrames: FrameData[] = [];
   let manualView: 'sagittal' | 'frontal' | null = null;
 
-  function buildJointStatuses(results: AnalysisResults): Partial<Record<number, MetricStatus>> {
-    const s: Partial<Record<number, MetricStatus>> = {};
-    const L = LANDMARKS;
-    const set = (indices: number[], status: MetricStatus) =>
-      indices.forEach((i) => { s[i] = status; });
-    if (results.kneeFlexionAtContact)
-      set([L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE, L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE],
-        results.kneeFlexionAtContact.status);
-    if (results.pelvicDrop)
-      set([L.LEFT_HIP, L.RIGHT_HIP], results.pelvicDrop.status);
-    if (results.trunkLateralLean)
-      set([L.LEFT_SHOULDER, L.RIGHT_SHOULDER, L.LEFT_HIP, L.RIGHT_HIP],
-        results.trunkLateralLean.status);
-    return s;
+  // Composites the current video frame + skeleton at native resolution for the
+  // PDF report. Drawing landmarks directly (rather than copying the overlay
+  // canvas) keeps alignment exact regardless of letterboxing, and works in the
+  // upload flow where the overlay was never drawn. JPEG because the shared PDF
+  // renderer embeds with the JPEG codec.
+  function captureAnnotatedFrame(lms: LandmarkArray): { dataUrl: string; aspect: number } | null {
+    // readyState < 2: no decoded frame — drawImage would silently no-op and
+    // produce a black frame (e.g. right after the camera stream is stopped).
+    if (!video.videoWidth || !video.videoHeight || video.readyState < 2) return null;
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    const cx = c.getContext('2d')!;
+    cx.drawImage(video, 0, 0, c.width, c.height);
+    drawSkeletonInto(cx, lms, c.width, c.height);
+    return { dataUrl: c.toDataURL('image/jpeg', 0.85), aspect: c.width / c.height };
   }
 
   // Shared analysis runner (video file and camera)
@@ -105,6 +136,10 @@ async function main() {
       showAnalysisWarning('Not enough footage to analyse — record at least 5 seconds of running.');
       return;
     }
+    // View-selector re-runs pass the same frames array back in; the video may
+    // have been scrubbed since, so recapturing would composite the current
+    // frame with end-of-video landmarks (misaligned skeleton in the PDF).
+    const isRerun = frames === lastFrames;
     lastFrames = frames;
     const durationSec = (frames[frames.length - 1].timestamp - frames[0].timestamp) / 1000;
     const fps  = frames.length / durationSec;
@@ -114,8 +149,12 @@ async function main() {
     const gaitCycles = segmentGaitCycles(gaitEvents);
     const results    = calculateAllMetrics(frames, gaitEvents, gaitCycles, fps, view);
     const findings   = generateFindings(results);
-    lastResults          = results;
-    lastAnalysisFrameUrl = overlay.captureDataUrl();
+    lastResults = results;
+    if (!isRerun) {
+      const captured = captureAnnotatedFrame(frames[frames.length - 1].landmarks);
+      lastAnalysisFrameUrl    = captured?.dataUrl ?? null;
+      lastAnalysisFrameAspect = captured?.aspect ?? null;
+    }
     renderDashboard(results, findings, view);
     renderViewSelector(
       detectedView,
@@ -430,6 +469,7 @@ async function main() {
       metrics: lastResults,
       findings: generateFindings(lastResults),
       frameDataUrl: lastAnalysisFrameUrl,
+      frameAspect: lastAnalysisFrameAspect,
     });
     closeReportModal();
   });

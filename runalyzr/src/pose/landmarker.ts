@@ -1,14 +1,7 @@
 import { initLandmarker as _initLandmarker } from '@runalyzr/shared/pose';
 import { MEDIAPIPE_CDN, HEAVY_MODEL_URL } from '../config/defaults';
-import type { LandmarkArray } from '@runalyzr/shared/types';
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
 
-type RunningMode = 'VIDEO' | 'IMAGE' | 'LIVE_STREAM';
-
-export async function initLandmarker(
-  modelUrl: string = HEAVY_MODEL_URL,
-  mode: RunningMode = 'VIDEO',
-  onResult?: (landmarks: LandmarkArray, timestamp: number) => void,
-): Promise<PoseLandmarker> {
-  return _initLandmarker(modelUrl, MEDIAPIPE_CDN, mode, onResult);
+export async function initLandmarker(): Promise<PoseLandmarker> {
+  return _initLandmarker(HEAVY_MODEL_URL, MEDIAPIPE_CDN);
 }
