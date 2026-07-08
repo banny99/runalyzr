@@ -1,13 +1,8 @@
 import type { SagittalMetrics, RearMetrics, FrontMetrics } from './types';
-import type { MetricResult } from '@runalyzr/shared/types';
+import { findingsFromTemplates } from '@runalyzr/shared/analysis';
+import type { FindingTemplate, TemplatedFinding } from '@runalyzr/shared/analysis';
 
-interface Finding {
-  metric: string;
-  status: 'amber' | 'red';
-  text: string;
-}
-
-type FindingTemplate = { red: string; amber: string };
+type Finding = TemplatedFinding;
 
 const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
   kneeExtensionBDC: {
@@ -68,36 +63,19 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
   },
 };
 
-function findingsFromMetricGroup<T extends Record<string, MetricResult | null>>(
-  metrics: T,
-): Finding[] {
-  const findings: Finding[] = [];
-  for (const [key, result] of Object.entries(metrics) as [string, MetricResult | null][]) {
-    if (!result || result.status === 'green' || result.status === 'unknown') continue;
-    const template = TEMPLATES[key];
-    if (!template) continue;
-    findings.push({
-      metric: key,
-      status: result.status as 'amber' | 'red',
-      text: template[result.status as 'red' | 'amber'].replace('{value}', result.value.toFixed(1)),
-    });
-  }
-  return findings;
-}
-
+// The template-substitution/sorting engine lives in @runalyzr/shared/analysis
+// (red-first sort included — previously copy-pasted across three wrappers);
+// only the template table above is app-specific.
 export function generateSagittalFindings(metrics: SagittalMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics).sort((a, b) =>
-    (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
+  return findingsFromTemplates(metrics, TEMPLATES);
 }
 
 export function generateRearFindings(metrics: RearMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics).sort((a, b) =>
-    (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
+  return findingsFromTemplates(metrics, TEMPLATES);
 }
 
 export function generateFrontFindings(metrics: FrontMetrics): Finding[] {
-  return findingsFromMetricGroup(metrics).sort((a, b) =>
-    (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1));
+  return findingsFromTemplates(metrics, TEMPLATES);
 }
 
 export type { Finding };

@@ -1,5 +1,6 @@
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
-import { FIT_STEPS, POSE_CONNECTIONS, OVERLAY_COLORS } from '../config/defaults';
+import { FIT_STEPS, OVERLAY_COLORS } from '../config/defaults';
+import { drawPoseSkeleton as drawSharedSkeleton } from '@runalyzr/shared/skeleton';
 import type { FitStep, FitView, RiderStep, BikeGeometryStep } from '../config/defaults';
 import { analyzeImage } from '../pose/processing';
 import { measureFitPosition } from '../analysis/fitMetrics';
@@ -7,7 +8,6 @@ import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
 import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
 import { openPointPlacement } from './pointPlacement';
 import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
-import type { LandmarkArray } from '@runalyzr/shared/types';
 
 export interface FitGuideController {
   start: () => void;
@@ -116,29 +116,6 @@ export function initFitGuide(
       canvas.getContext('2d')!.drawImage(img, 0, 0);
     };
     img.src = dataUrl;
-  }
-
-  // Bakes the pose skeleton onto a context at the given pixel size. Used both
-  // for the on-screen result and the annotated photo stored for the PDF report.
-  function drawPoseSkeleton(ctx: CanvasRenderingContext2D, lm: LandmarkArray, w: number, h: number) {
-    ctx.lineWidth = 2;
-    for (const [a, b] of POSE_CONNECTIONS) {
-      const lmA = lm[a];
-      const lmB = lm[b];
-      if (!lmA || !lmB) continue;
-      ctx.strokeStyle = OVERLAY_COLORS.neutral;
-      ctx.beginPath();
-      ctx.moveTo(lmA.x * w, lmA.y * h);
-      ctx.lineTo(lmB.x * w, lmB.y * h);
-      ctx.stroke();
-    }
-    for (const l of lm) {
-      if (!l || (l.visibility ?? 1) < 0.4) continue;
-      ctx.fillStyle = OVERLAY_COLORS.neutral;
-      ctx.beginPath();
-      ctx.arc(l.x * w, l.y * h, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 
   // ── Results panel ─────────────────────────────────────────────────────
@@ -350,7 +327,8 @@ export function initFitGuide(
       tempCanvas.height = img.naturalHeight;
       const tempCtx = tempCanvas.getContext('2d')!;
       tempCtx.drawImage(img, 0, 0);
-      drawPoseSkeleton(tempCtx, result.landmarks, tempCanvas.width, tempCanvas.height);
+      drawSharedSkeleton(tempCtx, result.landmarks, tempCanvas.width, tempCanvas.height,
+        { color: OVERLAY_COLORS.neutral });
       const imageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
       const imageAspect = img.naturalWidth / img.naturalHeight;
       URL.revokeObjectURL(url);

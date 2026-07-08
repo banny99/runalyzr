@@ -1,6 +1,6 @@
 import type { AnalysisResults, FindingItem } from './types';
-
-type FindingTemplate = { red: string; amber: string };
+import { findingsFromTemplates } from '@runalyzr/shared/analysis';
+import type { FindingTemplate } from '@runalyzr/shared/analysis';
 
 const FINDING_TEMPLATES: Partial<Record<keyof AnalysisResults, FindingTemplate>> = {
   kneeFlexionAtContact: {
@@ -45,22 +45,8 @@ const FINDING_TEMPLATES: Partial<Record<keyof AnalysisResults, FindingTemplate>>
   },
 };
 
+// The template-substitution/sorting engine lives in @runalyzr/shared/analysis;
+// only the template table above is app-specific.
 export function generateFindings(results: AnalysisResults): FindingItem[] {
-  const findings: FindingItem[] = [];
-
-  for (const [key, result] of Object.entries(results) as [keyof AnalysisResults, typeof results[keyof AnalysisResults]][]) {
-    if (!result || result.status === 'green' || result.status === 'unknown') continue;
-    const template = FINDING_TEMPLATES[key];
-    if (!template) continue;
-
-    const text = template[result.status as 'red' | 'amber'].replace(
-      '{value}',
-      result.value.toFixed(1),
-    );
-    findings.push({ metric: key, status: result.status as 'red' | 'amber', text });
-  }
-
-  return findings.sort((a, b) =>
-    (a.status === 'red' ? 0 : 1) - (b.status === 'red' ? 0 : 1)
-  );
+  return findingsFromTemplates(results, FINDING_TEMPLATES);
 }

@@ -15,6 +15,9 @@
       "@runalyzr/shared/math":  ["../shared/src/math/angles.ts"],
       "@runalyzr/shared/types": ["../shared/src/types/index.ts"],
       "@runalyzr/shared/pose":  ["../shared/src/pose/landmarker.ts"],
+      "@runalyzr/shared/processing": ["../shared/src/pose/processing.ts"],
+      "@runalyzr/shared/skeleton": ["../shared/src/pose/skeleton.ts"],
+      "@runalyzr/shared/analysis": ["../shared/src/analysis/index.ts"],
       "@runalyzr/shared/pdf":   ["../shared/src/pdf/renderer.ts"]
     }
   },

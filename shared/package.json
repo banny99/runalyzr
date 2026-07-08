@@ -6,6 +6,9 @@
     "./math": "./src/math/angles.ts",
     "./types": "./src/types/index.ts",
     "./pose": "./src/pose/landmarker.ts",
+    "./processing": "./src/pose/processing.ts",
+    "./skeleton": "./src/pose/skeleton.ts",
+    "./analysis": "./src/analysis/index.ts",
     "./pdf": "./src/pdf/renderer.ts"
   },
   "peerDependencies": {

@@ -36,10 +36,13 @@ Both apps use `moduleResolution: bundler`. `@runalyzr/shared/*` is resolved via 
 
 Both tsconfigs set `"noEmit": true`. Never let `tsc` emit `.js` into `src/` — Vite resolves `.js` before `.ts`, so stale emitted files silently shadow TypeScript sources in the dev server.
 
-Shared subpaths:
-- `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`
+Shared subpaths (each new subpath must be added in **three** places: `shared/package.json` exports, both apps' tsconfig `paths`, both apps' Vite `alias` — deliberately non-nested names so Vite's prefix-alias matching can't misroute them):
+- `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`, `tiltFromHorizontal`
 - `@runalyzr/shared/types` → `FrameData`, `LandmarkArray`, `CameraView`
-- `@runalyzr/shared/pose` → MediaPipe pose landmarker wrapper
+- `@runalyzr/shared/pose` → MediaPipe pose landmarker wrapper (`initLandmarker`, `setRunningMode`)
+- `@runalyzr/shared/processing` → `createProcessingLoop` (VFC/rAF frame loop; apps pass fps options and keep their own `detectCameraView`)
+- `@runalyzr/shared/skeleton` → `POSE_CONNECTIONS` + `drawPoseSkeleton` (single-colour static renders; the live overlays stay app-local for status colours/letterboxing)
+- `@runalyzr/shared/analysis` → threshold engine (`evaluateThreshold`, "green wins at boundary", `indicativeOnly`) + findings engine (`findingsFromTemplates`); the threshold/template **tables** stay app-local
 - `@runalyzr/shared/pdf` → jsPDF report renderer
 
 ## Non-Negotiable Invariants
@@ -93,10 +96,8 @@ Live in `@runalyzr/shared/math` (`shared/src/math/angles.ts`). Do not define the
 - Recording completion is signalled via the `onRecordingComplete(blobUrl)` callback in `CameraControllerDeps`, not inline DOM manipulation.
 - `initVideoPlayer()` returns a `() => void` keydown cleanup — stored as `cleanupVideoPlayer` for future use when CameraController is torn down.
 
-### runalyzr: Threshold evaluation
-`runalyzr/src/analysis/thresholds.ts`: **green wins at boundary**. Amber bands are half-open:
-- Lower amber: `value >= t.amber[0] && value < t.green[0]`
-- Upper amber: `value > t.green[1] && value <= t.amber[1]`
+### Threshold evaluation (shared engine)
+`shared/src/analysis/thresholds.ts` (`evaluateThreshold`): **green wins at boundary** — green is checked first, so amber bands that touch green are effectively half-open. `indicativeOnly` entries always evaluate to `unknown`. Both apps' `thresholds.ts` are thin wrappers holding only their metric tables. The findings engine (`findingsFromTemplates`: template lookup, `{value}` substitution, red-first sort) is shared the same way — template tables stay app-local.
 
 ### bike: Camera section
 Wrapped in `initRideCameraSection()` inside `bike/src/main.ts`. Returns `{ cameraFrames }` (array reference) since the view-button handler outside the function needs to read it.

@@ -1,19 +1,14 @@
 import type { PoseLandmarker } from '@mediapipe/tasks-vision';
+import { createProcessingLoop as createSharedLoop } from '@runalyzr/shared/processing';
+import type { ProcessingController } from '@runalyzr/shared/processing';
 import { FPS_TARGET, FPS_SKIP_THRESHOLD, LANDMARKS } from '../config/defaults';
-import type { FrameData, LandmarkArray, CameraView } from '@runalyzr/shared/types';
+import type { LandmarkArray, CameraView } from '@runalyzr/shared/types';
 import { setRunningMode } from '@runalyzr/shared/pose';
 
-// requestVideoFrameCallback (Safari 15.4+, Chrome 83+) fires exactly once per
-// decoded video frame — avoids processing duplicate frames.
+export type { ProcessingController };
 
-export interface ProcessingController {
-  start: () => void;
-  stop: () => void;
-  getFrames: () => FrameData[];
-  getCurrentLandmarks: () => LandmarkArray | null;
-  getFps: () => number;
-}
-
+// View thresholds are app-specific (bike distinguishes rear as well, for
+// trainer setups); the frame-processing loop itself is shared.
 export function detectCameraView(landmarks: LandmarkArray): CameraView {
   const leftHip  = landmarks[LANDMARKS.LEFT_HIP];
   const rightHip = landmarks[LANDMARKS.RIGHT_HIP];
@@ -45,77 +40,8 @@ export function createProcessingLoop(
   video: HTMLVideoElement,
   onFrame: (landmarks: LandmarkArray, timestamp: number) => void,
 ): ProcessingController {
-  let running = false;
-  let rafId = 0;
-  let lastProcessTime = 0;
-  let currentFps = FPS_TARGET;
-  const frames: FrameData[] = [];
-  let currentLandmarks: LandmarkArray | null = null;
-
-  const useVFC = typeof video.requestVideoFrameCallback === 'function';
-
-  function processFrame(now: DOMHighResTimeStamp) {
-    if (!running) return;
-
-    if (!video.paused && !video.ended && video.readyState >= 2) {
-      const elapsed = now - lastProcessTime;
-      const ready = useVFC || elapsed >= 1000 / FPS_TARGET;
-
-      if (ready) {
-        currentFps = elapsed > 0 ? 1000 / elapsed : FPS_TARGET;
-        const shouldProcess =
-          currentFps >= FPS_SKIP_THRESHOLD || frames.length % 2 === 0;
-
-        if (shouldProcess) {
-          const result = landmarker.detectForVideo(video, now);
-          if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
-            currentLandmarks = result.landmarks[0] as LandmarkArray;
-            frames.push({
-              timestamp: now,
-              landmarks: currentLandmarks,
-              worldLandmarks: result.worldLandmarks[0] as LandmarkArray,
-            });
-            onFrame(currentLandmarks, now);
-          }
-        }
-        lastProcessTime = now;
-      }
-    }
-
-    if (useVFC) {
-      rafId = video.requestVideoFrameCallback!(processFrame);
-    } else {
-      rafId = requestAnimationFrame(processFrame);
-    }
-  }
-
-  return {
-    start() {
-      running = true;
-      frames.length = 0;
-      currentLandmarks = null;
-      lastProcessTime = 0;
-      // The fit guide may have left the landmarker in IMAGE mode; switch back
-      // before the first detectForVideo call (no-op when already VIDEO).
-      void setRunningMode(landmarker, 'VIDEO').then(() => {
-        if (!running) return;
-        if (useVFC) {
-          rafId = video.requestVideoFrameCallback!(processFrame);
-        } else {
-          rafId = requestAnimationFrame(processFrame);
-        }
-      });
-    },
-    stop() {
-      running = false;
-      if (useVFC) {
-        video.cancelVideoFrameCallback?.(rafId);
-      } else {
-        cancelAnimationFrame(rafId);
-      }
-    },
-    getFrames: () => frames,
-    getCurrentLandmarks: () => currentLandmarks,
-    getFps: () => currentFps,
-  };
+  return createSharedLoop(landmarker, video, onFrame, {
+    fpsTarget: FPS_TARGET,
+    fpsSkipThreshold: FPS_SKIP_THRESHOLD,
+  });
 }
