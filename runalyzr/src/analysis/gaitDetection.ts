@@ -52,7 +52,10 @@ export function segmentGaitCycles(events: GaitEvent[]): GaitCycle[] {
         startFrame: start,
         endFrame: end,
         footstrikeFrame: start,
+        // Fallback is a guess (40 % of cycle) — flagged so consumers like
+        // groundContactTime don't present it as a measurement.
         toeOffFrame: toeOff?.frameIndex ?? Math.round(start + (end - start) * 0.4),
+        toeOffEstimated: toeOff === undefined,
       });
     }
   }

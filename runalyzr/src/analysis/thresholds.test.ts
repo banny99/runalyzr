@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateMetric } from './thresholds';
+import { evaluateMetric, THRESHOLDS } from './thresholds';
 
 describe('evaluateMetric', () => {
+  it('bands verticalOscillation as % of frame height (framing-dependent, not cm)', () => {
+    expect(THRESHOLDS.verticalOscillation.unit).toBe('% frame');
+    expect(evaluateMetric(2, 'verticalOscillation')).toBe('green');
+    expect(evaluateMetric(5, 'verticalOscillation')).toBe('amber');
+    expect(evaluateMetric(8, 'verticalOscillation')).toBe('red');
+  });
+
   it('returns green for cadence in green range', () => {
     expect(evaluateMetric(180, 'cadence')).toBe('green');
   });

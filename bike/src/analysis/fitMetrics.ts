@@ -1,5 +1,5 @@
 import type { Landmark, LandmarkArray } from '@runalyzr/shared/types';
-import { angleBetweenThreePoints, lateralAngle, midpoint } from '@runalyzr/shared/math';
+import { angleBetweenThreePoints, lateralAngle, tiltFromHorizontal, midpoint } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../config/defaults';
 import type { FitMeasurement } from './types';
 import type { Band } from './bands';
@@ -24,11 +24,6 @@ function entry(label: string, value: number, normalRange: string, band?: Band): 
 
 function angle(wlm: LandmarkArray, a: number, b: number, c: number): number {
   return angleBetweenThreePoints(wlm[a], wlm[b], wlm[c]);
-}
-
-/** Tilt of the line a–b away from horizontal, in degrees (0° = level). */
-function tiltFromHorizontal(a: Landmark, b: Landmark): number {
-  return (Math.atan2(Math.abs(a.y - b.y), Math.abs(a.x - b.x)) * 180) / Math.PI;
 }
 
 /**

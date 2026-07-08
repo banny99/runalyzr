@@ -18,7 +18,7 @@ Always `cd` into the workspace first — there is no root-level build or test co
 # runalyzr
 cd runalyzr && npm run build      # Vite build
 cd runalyzr && npm run dev        # Dev server
-cd runalyzr && npm test           # 39 Vitest tests
+cd runalyzr && npm test           # 46 Vitest tests
 
 # bike
 cd bike && npm run build          # Vite build
@@ -112,7 +112,7 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 
 | File | Tests | What's covered |
 |------|-------|----------------|
-| `runalyzr/src/analysis/*.test.ts` | 31 | Gait detection, metrics, thresholds, findings, angles (setup checks NOT covered — see issue #14) |
+| `runalyzr/src/analysis/*.test.ts` | 38 | Gait detection (incl. estimated toe-off), metrics (incl. pelvic-drop degrees, GCT honesty, view gating), thresholds, findings, angles (setup checks NOT covered — see issue #14) |
 | `runalyzr/src/ui/videoPlayer.test.ts` | 8 | Play/pause wiring, keydown guards (inputs, live camera, isBusy), cleanup, startCamera src-clearing (jsdom) |
 | `bike/src/analysis/pedalDetection.test.ts` | 7 | BDC/TDC detection, cadence, cycle segmentation |
 | `bike/src/analysis/metrics.test.ts` | 5 | hipRock, kneeSymmetry |
@@ -125,6 +125,8 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/report/pdfGenerator.test.ts` | 3 | buildReportSections includes rider + bike-geometry photos as section images |
 
 All bike metrics are **angles in degrees** (framing-independent, no calibration needed) except `hipRock` and `hipVerticalOscillation`, which are whole-body motion and reported as `% frame` — world landmarks can't measure whole-body translation because their origin travels with the hips. Fit-photo measurers receive **world landmarks**, not image landmarks.
+
+The same honesty rule applies in runalyzr: `verticalOscillation` is `% frame` (image landmarks, framing-dependent — its bands are provisional pending calibration) and `pelvicDrop` is a true hip-line tilt in degrees (`tiltFromHorizontal` in `@runalyzr/shared/math`). Ground-contact time averages only cycles with a *detected* toe-off (`GaitCycle.toeOffEstimated`); an `unknown` camera view computes sagittal metrics only, with a dashboard warning pointing to the view selector.
 
 **Upper-body fit angles** (torso, elbow, reach, shoulder) are captured **per side crank position** via `sideUpperBody(wlm)` in `fitMetrics.ts` (appended to `measureSide6OClock`/`3`/`9`) — the old dedicated "Neutral Seated" steps were removed as vague/duplicative. Torso and elbow use validated bands; **Reach and Shoulder are informational** (no band → `status: 'unknown'`) pending calibration. The ride video mirrors this: `shoulderAngle` and `reachAngle` are averaged across frames in `metrics/sagittal.ts` and flagged `indicativeOnly` in `thresholds.ts`.
 

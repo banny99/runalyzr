@@ -3,9 +3,11 @@ import {
   calculateKneeFlexionAtContact,
   calculateTrunkLateralLean,
   calculateVerticalOscillation,
+  calculatePelvicDrop,
+  calculateGroundContactTime,
   calculateAllMetrics,
 } from './metrics';
-import type { FrameData, GaitEvent, Landmark } from './types';
+import type { FrameData, GaitEvent, GaitCycle, Landmark } from './types';
 
 function lm(x: number, y: number): Landmark {
   return { x, y, z: 0, visibility: 1 };
@@ -60,13 +62,54 @@ describe('calculateTrunkLateralLean', () => {
 });
 
 describe('calculateVerticalOscillation', () => {
-  it('returns peak-to-peak hip oscillation in cm', () => {
+  it('returns peak-to-peak hip oscillation as % of frame height', () => {
     const frames: FrameData[] = [0.45, 0.5, 0.55, 0.5, 0.45].map((y) =>
       makeFrame({ 23: lm(0.4, y), 24: lm(0.6, y) })
     );
     const result = calculateVerticalOscillation(frames);
-    // midpoint y oscillates 0.45–0.55, displacement = 0.1 × 100 = 10 cm
+    // image-landmark midpoint y oscillates 0.45–0.55 of frame height,
+    // displacement = 0.1 × 100 = 10 % of frame (framing-dependent — honest cm
+    // would need a calibration reference; same reasoning as bike's CLAUDE.md)
     expect(result).toBeCloseTo(10, 0);
+  });
+});
+
+describe('calculatePelvicDrop', () => {
+  const events: GaitEvent[] = [
+    { type: 'footstrike', foot: 'left',  frameIndex: 0, timestamp: 0 },
+    { type: 'footstrike', foot: 'right', frameIndex: 0, timestamp: 100 },
+  ];
+
+  it('reports 0° for a level hip line', () => {
+    const frame = makeFrame({ 23: lm(0.4, 0.5), 24: lm(0.6, 0.5) });
+    expect(calculatePelvicDrop([frame], events)).toBeCloseTo(0, 1);
+  });
+
+  it('reports the hip-line tilt in degrees (45° when drop equals span)', () => {
+    // hips 0.2 apart horizontally with a 0.2 vertical offset → 45° tilt
+    const frame = makeFrame({ 23: lm(0.4, 0.4), 24: lm(0.6, 0.6) });
+    expect(calculatePelvicDrop([frame], events)).toBeCloseTo(45, 1);
+  });
+});
+
+describe('calculateGroundContactTime', () => {
+  const cycle = (footstrike: number, toeOff: number, estimated: boolean): GaitCycle => ({
+    foot: 'left',
+    startFrame: footstrike,
+    endFrame: footstrike + 30,
+    footstrikeFrame: footstrike,
+    toeOffFrame: toeOff,
+    toeOffEstimated: estimated,
+  });
+
+  it('averages only cycles with a measured toe-off', () => {
+    // measured: (10-0)/30fps = 333ms; the estimated 20-frame cycle must not skew it
+    const result = calculateGroundContactTime([cycle(0, 10, false), cycle(30, 50, true)], 30);
+    expect(result).toBeCloseTo(333, 0);
+  });
+
+  it('returns null when every toe-off is estimated (would be fiction)', () => {
+    expect(calculateGroundContactTime([cycle(0, 12, true)], 30)).toBeNull();
   });
 });
 
@@ -81,5 +124,19 @@ describe('calculateAllMetrics', () => {
     const results = calculateAllMetrics([], [], [], 30, 'frontal');
     expect(results.kneeFlexionAtContact).toBeNull();
     expect(results.ankleDorsiflexion).toBeNull();
+  });
+
+  it('does not fabricate frontal metrics when the view is unknown (assumes sagittal)', () => {
+    const frame = makeFrame({ 23: lm(0.4, 0.4), 24: lm(0.6, 0.6) });
+    const events: GaitEvent[] = [
+      { type: 'footstrike', foot: 'left',  frameIndex: 0, timestamp: 0 },
+      { type: 'footstrike', foot: 'right', frameIndex: 0, timestamp: 100 },
+    ];
+    const results = calculateAllMetrics([frame], events, [], 30, 'unknown');
+    expect(results.pelvicDrop).toBeNull();
+    expect(results.hipAdduction).toBeNull();
+    expect(results.trunkLateralLean).toBeNull();
+    // ...and DOES compute the sagittal set (unknown assumes side view)
+    expect(results.kneeFlexionAtContact).not.toBeNull();
   });
 });

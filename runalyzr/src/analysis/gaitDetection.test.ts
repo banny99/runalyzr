@@ -54,5 +54,17 @@ describe('segmentGaitCycles', () => {
     expect(leftCycles[0].startFrame).toBe(0);
     expect(leftCycles[0].endFrame).toBe(30);
     expect(leftCycles[0].toeOffFrame).toBe(10);
+    expect(leftCycles[0].toeOffEstimated).toBe(false);
+  });
+
+  it('marks the toe-off as estimated when detection found none in the cycle', () => {
+    const events: GaitEvent[] = [
+      { type: 'footstrike', foot: 'left', frameIndex: 0, timestamp: 0 },
+      { type: 'footstrike', foot: 'left', frameIndex: 30, timestamp: 1000 },
+    ];
+    const cycles = segmentGaitCycles(events);
+    expect(cycles).toHaveLength(1);
+    expect(cycles[0].toeOffFrame).toBe(12); // 40 % of the 30-frame cycle
+    expect(cycles[0].toeOffEstimated).toBe(true);
   });
 });
