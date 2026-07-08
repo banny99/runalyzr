@@ -5,7 +5,6 @@ import { FPS_TARGET, FPS_SKIP_THRESHOLD, LANDMARKS } from '../config/defaults';
 import type { LandmarkArray, CameraView } from '@runalyzr/shared/types';
 import { setRunningMode } from '@runalyzr/shared/pose';
 
-export type { ProcessingController };
 
 // View thresholds are app-specific (bike distinguishes rear as well, for
 // trainer setups); the frame-processing loop itself is shared.

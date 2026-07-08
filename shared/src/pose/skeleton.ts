@@ -24,6 +24,11 @@ export interface SkeletonStyle {
  * visibility. Used for static renders (annotated photos, PDF report frames).
  * The live overlays keep their own app-local drawers — they add per-joint
  * status colours and letterbox mapping that static renders don't need.
+ *
+ * Note: bike's pre-extraction drawer gated only the joint dots, so its baked
+ * fit photos used to draw lines through occluded landmarks. The endpoint
+ * gating here is a deliberate alignment with the live overlays, not a
+ * faithful port. Pass `minVisibility: 0` to reproduce the old behaviour.
  */
 export function drawPoseSkeleton(
   ctx: CanvasRenderingContext2D,

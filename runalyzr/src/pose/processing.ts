@@ -4,7 +4,6 @@ import type { ProcessingController } from '@runalyzr/shared/processing';
 import { FPS_TARGET, FPS_SKIP_THRESHOLD, LANDMARKS } from '../config/defaults';
 import type { LandmarkArray, CameraView } from '../analysis/types';
 
-export type { ProcessingController };
 
 // View thresholds are app-specific (runalyzr distinguishes only frontal vs
 // sagittal for running form); the frame-processing loop itself is shared.
