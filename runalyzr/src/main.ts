@@ -9,36 +9,10 @@ import { detectGaitEvents, segmentGaitCycles } from './analysis/gaitDetection';
 import { calculateAllMetrics } from './analysis/metrics';
 import { generateFindings } from './analysis/findings';
 import { buildJointStatuses } from './analysis/jointStatuses';
-import { LANDMARKS, POSE_CONNECTIONS, OVERLAY_COLORS } from './config/defaults';
+import { LANDMARKS, OVERLAY_COLORS } from './config/defaults';
+import { drawPoseSkeleton } from '@runalyzr/shared/skeleton';
 import type { LandmarkArray, AnalysisResults, FrameData, CameraView } from './analysis/types';
 import { initCameraController } from './ui/cameraController';
-
-// Draws the pose skeleton onto an arbitrary context at the given pixel size.
-// Visibility-gated on both connection endpoints and dots, matching the live
-// overlay. Slightly heavier stroke/radius than the on-screen overlay because
-// this renders at native video resolution for the PDF. Candidate for the
-// shared skeleton drawer planned in issue #14 part 2.
-function drawSkeletonInto(cx: CanvasRenderingContext2D, lms: LandmarkArray, w: number, h: number): void {
-  const visible = (l: LandmarkArray[number] | undefined) => !!l && (l.visibility ?? 1) >= 0.4;
-  cx.lineWidth = 3;
-  cx.strokeStyle = OVERLAY_COLORS.neutral;
-  cx.fillStyle = OVERLAY_COLORS.neutral;
-  for (const [a, b] of POSE_CONNECTIONS) {
-    const la = lms[a];
-    const lb = lms[b];
-    if (!visible(la) || !visible(lb)) continue;
-    cx.beginPath();
-    cx.moveTo(la.x * w, la.y * h);
-    cx.lineTo(lb.x * w, lb.y * h);
-    cx.stroke();
-  }
-  for (const l of lms) {
-    if (!visible(l)) continue;
-    cx.beginPath();
-    cx.arc(l.x * w, l.y * h, 5, 0, Math.PI * 2);
-    cx.fill();
-  }
-}
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -124,7 +98,10 @@ async function main() {
     c.height = video.videoHeight;
     const cx = c.getContext('2d')!;
     cx.drawImage(video, 0, 0, c.width, c.height);
-    drawSkeletonInto(cx, lms, c.width, c.height);
+    // Heavier stroke/radius than the live overlay: this renders at native
+    // video resolution for the PDF.
+    drawPoseSkeleton(cx, lms, c.width, c.height,
+      { color: OVERLAY_COLORS.neutral, lineWidth: 3, jointRadius: 5 });
     return { dataUrl: c.toDataURL('image/jpeg', 0.85), aspect: c.width / c.height };
   }
 

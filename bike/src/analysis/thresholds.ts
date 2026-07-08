@@ -1,16 +1,12 @@
 import type { MetricStatus, MetricResult } from '@runalyzr/shared/types';
+import { evaluateThreshold, thresholdMetricResult } from '@runalyzr/shared/analysis';
+import type { ThresholdEntry } from '@runalyzr/shared/analysis';
 import type { SagittalMetrics, RearMetrics, FrontMetrics } from './types';
 
 type AllMetricKeys = keyof SagittalMetrics | keyof RearMetrics | keyof FrontMetrics;
 
-interface ThresholdEntry {
-  green: [number, number];
-  amber: [number, number];
-  unit: string;
-  direction: 'lower_is_worse' | 'higher_is_worse';
-  indicativeOnly?: boolean;
-}
-
+// The evaluation engine (green wins at the boundary, indicativeOnly support)
+// lives in @runalyzr/shared/analysis — only the table is app-specific.
 export const THRESHOLDS: Partial<Record<AllMetricKeys, ThresholdEntry>> = {
   // Sagittal
   kneeExtensionBDC:       { green: [145, 155], amber: [135, 145], unit: '°',     direction: 'lower_is_worse' },
@@ -39,21 +35,9 @@ export const THRESHOLDS: Partial<Record<AllMetricKeys, ThresholdEntry>> = {
 };
 
 export function evaluateMetric(value: number, key: AllMetricKeys): MetricStatus {
-  const t = THRESHOLDS[key];
-  if (!t) return 'unknown';
-  if (t.indicativeOnly) return 'unknown';
-  if (value >= t.green[0] && value <= t.green[1]) return 'green';
-  if (value >= t.amber[0] && value <= t.amber[1]) return 'amber';
-  if (t.direction === 'higher_is_worse' && value < t.green[0]) return 'green';
-  if (t.direction === 'lower_is_worse' && value > t.green[1]) return 'green';
-  return 'red';
+  return evaluateThreshold(value, THRESHOLDS[key]);
 }
 
 export function makeMetricResult(value: number, key: AllMetricKeys): MetricResult {
-  const t = THRESHOLDS[key];
-  return {
-    value,
-    status: evaluateMetric(value, key),
-    unit: t?.unit ?? '',
-  };
+  return thresholdMetricResult(value, THRESHOLDS[key]);
 }

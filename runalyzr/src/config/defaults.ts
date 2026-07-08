@@ -12,15 +12,7 @@ export const LANDMARKS = {
   RIGHT_FOOT_INDEX: 32,
 } as const;
 
-export const POSE_CONNECTIONS: [number, number][] = [
-  [11, 12],          // shoulders
-  [11, 23], [12, 24], // shoulder → hip
-  [23, 24],          // hips
-  [23, 25], [25, 27], [27, 31], // left leg
-  [24, 26], [26, 28], [28, 32], // right leg
-  [11, 13], [13, 15], // left arm
-  [12, 14], [14, 16], // right arm
-];
+export { POSE_CONNECTIONS } from '@runalyzr/shared/skeleton';
 
 export const OVERLAY_COLORS = {
   green: '#22c55e',

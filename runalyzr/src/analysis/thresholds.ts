@@ -1,12 +1,9 @@
 import type { MetricStatus, MetricResult, AnalysisResults } from './types';
+import { evaluateThreshold, thresholdMetricResult } from '@runalyzr/shared/analysis';
+import type { ThresholdEntry } from '@runalyzr/shared/analysis';
 
-interface ThresholdEntry {
-  green: [number, number];
-  amber: [number, number];
-  unit: string;
-  direction: 'lower_is_worse' | 'higher_is_worse';
-}
-
+// The evaluation engine (green wins at the boundary, half-open amber bands)
+// lives in @runalyzr/shared/analysis — only the table is app-specific.
 export const THRESHOLDS: Record<keyof AnalysisResults, ThresholdEntry> = {
   kneeFlexionAtContact:  { green: [155, 170], amber: [145, 155], unit: '°',    direction: 'lower_is_worse' },
   cadence:               { green: [170, 195], amber: [160, 170], unit: ' spm', direction: 'lower_is_worse' },
@@ -29,28 +26,12 @@ export function evaluateMetric(
   value: number,
   key: keyof typeof THRESHOLDS,
 ): MetricStatus {
-  const t = THRESHOLDS[key];
-  if (!t) return 'unknown';
-
-  // Green is checked first; amber ranges that touch the green boundary are
-  // half-open [amber.lo, green.lo) and (green.hi, amber.hi] — boundary values are green.
-  if (value >= t.green[0] && value <= t.green[1]) return 'green';
-  if (value >= t.amber[0] && value < t.green[0]) return 'amber';
-  if (value > t.green[1] && value <= t.amber[1]) return 'amber';
-
-  if (t.direction === 'higher_is_worse' && value < t.green[0]) return 'green';
-  if (t.direction === 'lower_is_worse'  && value > t.green[1]) return 'green';
-
-  return 'red';
+  return evaluateThreshold(value, THRESHOLDS[key]);
 }
 
 export function makeMetricResult(
   value: number,
   key: keyof typeof THRESHOLDS,
 ): MetricResult {
-  return {
-    value,
-    status: evaluateMetric(value, key),
-    unit: THRESHOLDS[key].unit,
-  };
+  return thresholdMetricResult(value, THRESHOLDS[key]);
 }

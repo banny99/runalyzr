@@ -6,7 +6,7 @@ TypeScript monorepo: **runalyzr** (run form analysis) and **bike** (bike fitting
 
 | Directory | Package | Role |
 |-----------|---------|------|
-| `shared/` | `@runalyzr/shared` | Math utilities, types, pose landmarker, PDF renderer |
+| `shared/` | `@runalyzr/shared` | Math utilities, types, pose landmarker, frame-processing loop, skeleton drawer, threshold/findings engines, PDF renderer |
 | `runalyzr/` | — | Run form analysis web app |
 | `bike/` | — | Bike fitting analysis web app |
 
@@ -27,7 +27,7 @@ cd bike && npm test               # 60 Vitest tests
 cd bike && npx tsc --noEmit       # Type-only check (no separate build step)
 
 # shared
-cd shared && npm test             # 4 Vitest tests (setRunningMode)
+cd shared && npm test             # 13 Vitest tests (setRunningMode, threshold + findings engines)
 ```
 
 ## Module Resolution
@@ -36,10 +36,13 @@ Both apps use `moduleResolution: bundler`. `@runalyzr/shared/*` is resolved via 
 
 Both tsconfigs set `"noEmit": true`. Never let `tsc` emit `.js` into `src/` — Vite resolves `.js` before `.ts`, so stale emitted files silently shadow TypeScript sources in the dev server.
 
-Shared subpaths:
-- `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`
+Shared subpaths (each new subpath must be added in **three** places: `shared/package.json` exports, both apps' tsconfig `paths`, both apps' Vite `alias` — deliberately non-nested names so Vite's prefix-alias matching can't misroute them):
+- `@runalyzr/shared/math` → math utilities + `findLocalMaxima`/`findLocalMinima`, `tiltFromHorizontal`
 - `@runalyzr/shared/types` → `FrameData`, `LandmarkArray`, `CameraView`
-- `@runalyzr/shared/pose` → MediaPipe pose landmarker wrapper
+- `@runalyzr/shared/pose` → MediaPipe pose landmarker wrapper (`initLandmarker`, `setRunningMode`)
+- `@runalyzr/shared/processing` → `createProcessingLoop` (VFC/rAF frame loop; apps pass fps options and keep their own `detectCameraView`)
+- `@runalyzr/shared/skeleton` → `POSE_CONNECTIONS` + `drawPoseSkeleton` (single-colour static renders; the live overlays stay app-local for status colours/letterboxing)
+- `@runalyzr/shared/analysis` → threshold engine (`evaluateThreshold`, "green wins at boundary", `indicativeOnly`) + findings engine (`findingsFromTemplates`); the threshold/template **tables** stay app-local
 - `@runalyzr/shared/pdf` → jsPDF report renderer
 
 ## Non-Negotiable Invariants
@@ -63,7 +66,7 @@ Both videoPlayer.ts files follow this pattern.
 Avoid `as any` and `as unknown as T`. Use generic constraints:
 ```typescript
 // ✅
-function findingsFromMetricGroup<T extends Record<string, MetricResult | null>>(metrics: T)
+function findingsFromTemplates<K extends string>(metrics: Partial<Record<K, MetricResult | null>>, ...)
 // ❌
 metrics as unknown as Record<string, MetricResult | null>
 ```
@@ -93,10 +96,8 @@ Live in `@runalyzr/shared/math` (`shared/src/math/angles.ts`). Do not define the
 - Recording completion is signalled via the `onRecordingComplete(blobUrl)` callback in `CameraControllerDeps`, not inline DOM manipulation.
 - `initVideoPlayer()` returns a `() => void` keydown cleanup — stored as `cleanupVideoPlayer` for future use when CameraController is torn down.
 
-### runalyzr: Threshold evaluation
-`runalyzr/src/analysis/thresholds.ts`: **green wins at boundary**. Amber bands are half-open:
-- Lower amber: `value >= t.amber[0] && value < t.green[0]`
-- Upper amber: `value > t.green[1] && value <= t.amber[1]`
+### Threshold evaluation (shared engine)
+`shared/src/analysis/thresholds.ts` (`evaluateThreshold`): **green wins at boundary** — green is checked first, so amber bands that touch green are effectively half-open. `indicativeOnly` entries always evaluate to `unknown`. Both apps' `thresholds.ts` are thin wrappers holding only their metric tables. The findings engine (`findingsFromTemplates`: template lookup, `{value}` substitution, red-first sort) is shared the same way — template tables stay app-local.
 
 ### bike: Camera section
 Wrapped in `initRideCameraSection()` inside `bike/src/main.ts`. Returns `{ cameraFrames }` (array reference) since the view-button handler outside the function needs to read it.
@@ -105,8 +106,8 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 
 **Ride video upload** relies on the video's **native `controls`**: `videoPlayer.ts` sets `video.controls = true` when a file is loaded and `false` in `startCamera`/`stopCamera` (camera uses the app's own record button). Playback is what drives frame collection — `onPlay → loop.start()` (which sets the landmarker to VIDEO mode), analysis runs on `pause`/`ended`. Without controls there is no way to play an uploaded video, so don't remove them. The `#ride-overlay` skeleton canvas is `pointer-events: none`, so native controls stay clickable underneath.
 
-### bike: Findings generic helper
-`findingsFromMetricGroup<T extends Record<string, MetricResult | null>>` in `bike/src/analysis/findings.ts`. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` to satisfy this constraint.
+### bike: Findings metric-interface constraint
+bike's findings go through the shared `findingsFromTemplates<K extends string>(metrics: Partial<Record<K, MetricResult | null>>, templates)` engine. The three metric interfaces (`SagittalMetrics`, `RearMetrics`, `FrontMetrics`) extend `Record<string, MetricResult | null>` — still load-bearing: it's what makes them assignable to the engine's parameter without casts.
 
 ### bike: Point placement overlay
 `bike/src/ui/pointPlacement.ts` — fullscreen, promise-based (`openPointPlacement(...): Promise<PlacedPoint[] | null>`, resolves points on Done, `null` on Cancel). Creates its own DOM under `document.body` and never shares DOM/CSS with the step card (the v1 branch failed precisely because the placement canvas lived inside the card layout). Points are normalised to the *image* (0–1 of natural size), not the canvas — the canvas letterboxes. `fitGuide.ts` awaits it for `kind: 'bike'` steps and keeps raw photos in `bikeRawPhotos` so "Edit points" re-edits the original, not the annotated render. Fit steps are a discriminated union (`FitStep = RiderStep | BikeGeometryStep`) in `bike/src/config/defaults.ts`; `AngleDefinition.pointC` only narrows under a positive `reference === 'ab_to_c'` check.
@@ -123,6 +124,8 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |
 | `bike/src/analysis/fitMetrics.test.ts` | 12 | Angle-based fit-photo measurers (obliquity, knee alignment, shank/KOPS) + per-position upper-body angles (`sideUpperBody`, incl. graceful degradation) and front lateral trunk lean |
 | `shared/src/pose/runningMode.test.ts` | 4 | `setRunningMode` mode tracking and dedup (lives with the code it tests) |
+| `shared/src/analysis/thresholds.test.ts` | 6 | evaluateThreshold: green-wins-at-boundary invariant, direction fall-throughs, indicativeOnly/missing → unknown, gap-band semantics |
+| `shared/src/analysis/findings.test.ts` | 3 | findingsFromTemplates: {value} substitution, green/unknown/null skips, red-first stable sort |
 | `bike/src/analysis/bikeGeometryMetrics.test.ts` | 14 | computeBikeAngles (signed/unsigned/3-point, aspect scaling, band status), anglePointPairs |
 | `bike/src/ui/placementSequence.test.ts` | 5 | firstUnplacedFrom sequencing |
 | `bike/src/analysis/bands.test.ts` | 4 | bandStatus green/amber/unknown evaluation |
