@@ -18,7 +18,7 @@ Always `cd` into the workspace first — there is no root-level build or test co
 # runalyzr
 cd runalyzr && npm run build      # Vite build
 cd runalyzr && npm run dev        # Dev server
-cd runalyzr && npm test           # 38 Vitest tests
+cd runalyzr && npm test           # 39 Vitest tests
 
 # bike
 cd bike && npm run build          # Vite build
@@ -113,7 +113,7 @@ Recording lock uses `recordingLockTimeout: ReturnType<typeof window.setTimeout> 
 | File | Tests | What's covered |
 |------|-------|----------------|
 | `runalyzr/src/analysis/*.test.ts` | 31 | Gait detection, metrics, thresholds, findings, angles (setup checks NOT covered — see issue #14) |
-| `runalyzr/src/ui/videoPlayer.test.ts` | 7 | Play/pause wiring, keydown guards (inputs, live camera), cleanup, startCamera src-clearing (jsdom) |
+| `runalyzr/src/ui/videoPlayer.test.ts` | 8 | Play/pause wiring, keydown guards (inputs, live camera, isBusy), cleanup, startCamera src-clearing (jsdom) |
 | `bike/src/analysis/pedalDetection.test.ts` | 7 | BDC/TDC detection, cadence, cycle segmentation |
 | `bike/src/analysis/metrics.test.ts` | 5 | hipRock, kneeSymmetry |
 | `bike/src/analysis/findings.test.ts` | 10 | generateRear/Sagittal/FrontFindings |

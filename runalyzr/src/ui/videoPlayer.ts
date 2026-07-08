@@ -3,6 +3,9 @@ export interface VideoPlayerCallbacks {
   onPause: () => void;
   onSeeked: () => void;
   onLoadedMetadata: () => void;
+  /** When true, keyboard frame-stepping is suppressed (e.g. during the
+   *  silent-analysis seek loop, where a user seek would corrupt a frame). */
+  isBusy?: () => boolean;
 }
 
 export function initVideoPlayer(
@@ -67,6 +70,7 @@ export function initVideoPlayer(
     // is active (pausing a stream-backed element freezes preview + recording)
     // and while typing in form fields (the report modal needs its caret keys).
     if (video.srcObject) return;
+    if (callbacks.isBusy?.()) return;
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if (e.key === 'ArrowLeft') {

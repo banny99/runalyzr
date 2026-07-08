@@ -388,6 +388,18 @@ export function initCameraController(deps: CameraControllerDeps) {
       cancelAnimationFrame(cameraRafId);
       recordBtn.disabled = false;
       clearInterval(recTimerInterval);
+      // Stop any in-flight recorder and discard its chunks — otherwise the
+      // orphaned recorder keeps feeding the shared recordedChunks array and
+      // its stale data interleaves into the NEXT recording's blob (issue #12).
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+      }
+      mediaRecorder = null;
+      compositeCanvas = null;
+      compositeCtx = null;
+      recordedChunks.length = 0;
       stopCamera(video);
       recordBtn.classList.remove('ready', 'recording');
       viewModeBtn.style.display = 'none';

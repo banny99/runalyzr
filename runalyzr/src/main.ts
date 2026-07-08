@@ -143,6 +143,21 @@ async function main() {
     updateLiveMetrics(null, detectCameraView(landmarks), loop.getFps());
   });
 
+  // Runs BEFORE initVideoPlayer's change listener (registration order): if the
+  // camera is open when a file is picked, close it first so the live stream's
+  // srcObject doesn't swallow the upload and close() doesn't wipe the new src
+  // (issue #12). Also retire the Share button — it shares the previous
+  // recording, not this upload.
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files?.length) {
+      if (cameraActive) {
+        cameraActive = false;
+        cameraController.close();
+      }
+      shareVideoBtn.style.display = 'none';
+    }
+  });
+
   // keydown cleanup — call this if video player is ever torn down (see Task 10)
   const cleanupVideoPlayer = initVideoPlayer(video, fileInput, {
     onLoadedMetadata: () => {
@@ -156,6 +171,7 @@ async function main() {
       const lm = loop.getCurrentLandmarks();
       if (lm) overlay.drawSkeleton(lm, lastResults ? buildJointStatuses(lastResults) : {});
     },
+    isBusy: () => analysing,
   });
   void cleanupVideoPlayer;
 
@@ -280,11 +296,32 @@ async function main() {
 
     video.pause();
 
-    const duration = video.duration;
+    let duration = video.duration;
+    if (duration === Infinity) {
+      // Chrome MediaRecorder WebM quirk: recorded blobs report Infinity until
+      // the element is seeked past the end, which forces duration resolution.
+      duration = await new Promise<number>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          video.removeEventListener('durationchange', onDurationChange);
+          resolve(NaN);
+        }, 3000);
+        const onDurationChange = () => {
+          if (Number.isFinite(video.duration)) {
+            clearTimeout(timeout);
+            video.removeEventListener('durationchange', onDurationChange);
+            resolve(video.duration);
+          }
+        };
+        video.addEventListener('durationchange', onDurationChange);
+        video.currentTime = Number.MAX_SAFE_INTEGER;
+      });
+      video.currentTime = 0;
+    }
     if (!Number.isFinite(duration) || duration <= 0) {
       overlayEl.style.display = 'none';
       analyseBtn.disabled = false;
       analysing = false;
+      alert('Could not determine the video duration. Try re-recording or uploading the file again.');
       return;
     }
     const step     = 1 / 30;
@@ -308,7 +345,13 @@ async function main() {
 
       if (!analysing) break;
 
-      const result = landmarker.detectForVideo(video, Math.round(t * 1000));
+      // MediaPipe VIDEO mode requires monotonically increasing timestamps per
+      // landmarker instance. The camera loop and processing loop both stamp
+      // with the performance.now() clock, so use it here too — a 0-based clock
+      // would regress after camera use (or on a second Analyse) and make
+      // MediaPipe reject the frame. Video time still goes into FrameData
+      // below, where cadence/duration math needs it.
+      const result = landmarker.detectForVideo(video, performance.now());
 
       if (result.landmarks.length > 0 && result.worldLandmarks.length > 0) {
         frames.push({
