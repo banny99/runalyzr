@@ -5,7 +5,7 @@ import { THRESHOLDS } from '../analysis/thresholds';
 function validMetricsForView(view: CameraView): Set<string> | null {
   if (view === 'sagittal') return SAGITTAL_METRICS;
   if (view === 'frontal')  return FRONTAL_METRICS;
-  return null; // unknown → show all
+  return null; // unknown → no filter (frontal results are null anyway: metrics assume sagittal)
 }
 
 export function renderDashboard(
@@ -151,15 +151,28 @@ export function renderViewSelector(
   container.appendChild(label);
 
   if (manualView === null) {
-    const btn = document.createElement('button');
-    btn.className = 'view-selector-btn';
-    btn.textContent = 'Switch';
-    btn.addEventListener('click', () => {
-      const next: 'sagittal' | 'frontal' =
-        activeView === 'sagittal' ? 'frontal' : 'sagittal';
-      onSwitch(next);
-    });
-    container.appendChild(btn);
+    if (activeView === 'unknown' || activeView === 'rear') {
+      // Detection failed: a single toggle could never reach 'frontal' (it
+      // flips unknown → sagittal → reset → unknown), so offer both views
+      // explicitly — metrics assume sagittal until the user corrects it.
+      for (const [text, view] of [['Side', 'sagittal'], ['Front', 'frontal']] as const) {
+        const btn = document.createElement('button');
+        btn.className = 'view-selector-btn';
+        btn.textContent = text;
+        btn.addEventListener('click', () => onSwitch(view));
+        container.appendChild(btn);
+      }
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'view-selector-btn';
+      btn.textContent = 'Switch';
+      btn.addEventListener('click', () => {
+        const next: 'sagittal' | 'frontal' =
+          activeView === 'sagittal' ? 'frontal' : 'sagittal';
+        onSwitch(next);
+      });
+      container.appendChild(btn);
+    }
   } else {
     const btn = document.createElement('button');
     btn.className = 'view-selector-reset';

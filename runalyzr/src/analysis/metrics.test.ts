@@ -136,5 +136,7 @@ describe('calculateAllMetrics', () => {
     expect(results.pelvicDrop).toBeNull();
     expect(results.hipAdduction).toBeNull();
     expect(results.trunkLateralLean).toBeNull();
+    // ...and DOES compute the sagittal set (unknown assumes side view)
+    expect(results.kneeFlexionAtContact).not.toBeNull();
   });
 });

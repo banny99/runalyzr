@@ -128,8 +128,10 @@ async function main() {
     const qualityWarnings = evaluateVideoQuality(frames, safeView);
     if (view === 'unknown') {
       // Metrics assume a side view in this case (frontal metrics from an
-      // unidentified view would be meaningless) — tell the user how to fix it.
-      qualityWarnings.unshift('Camera view could not be detected — assuming side view. Use the view buttons above to correct this.');
+      // unidentified view would be meaningless). This changes the meaning of
+      // every displayed metric, so use the always-visible analysis-warning
+      // banner — not the collapsed quality list — and point at the selector.
+      showAnalysisWarning('Camera view could not be detected — assuming side view. Use the Side/Front buttons in the results header to correct this.');
     }
     if (qualityWarnings.length > 0) showQualityWarning(qualityWarnings);
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
