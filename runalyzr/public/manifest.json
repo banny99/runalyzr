@@ -7,6 +7,6 @@
   "background_color": "#0f0f0f",
   "theme_color": "#22c55e",
   "icons": [
-    { "src": "/runalyzr/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/runalyzr/run/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }
