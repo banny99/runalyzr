@@ -3,3 +3,6 @@ dist/
 .worktrees/
 .claude/
 .superpowers/
+
+# tsc output must never sit next to sources (Vite resolves .js before .ts)
+*/src/**/*.js
