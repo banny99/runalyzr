@@ -2,16 +2,29 @@ import type { Band, ThresholdEntry } from '../analysis/index';
 
 export type BandField = 'lowRedAt' | 'green0' | 'green1' | 'highRedAt';
 
-const FIELD_ORDER: readonly BandField[] = ['lowRedAt', 'green0', 'green1', 'highRedAt'];
+/** All four band edges, low to high on the number line. */
+export const FIELD_ORDER: readonly BandField[] = ['lowRedAt', 'green0', 'green1', 'highRedAt'];
 
-/** Fields the user can edit for an entry, ordered low to high on the number line. */
+/**
+ * Fields the user can edit for an entry, ordered low to high on the number line.
+ * Only edges that change a status: on one-sided entries everything past green on
+ * the safe side is green anyway, so that green edge is read-only (see fixedField).
+ */
 export function editableFields(t: ThresholdEntry): BandField[] {
   if (t.indicativeOnly) return [];
   switch (t.direction) {
     case 'two_sided': return ['lowRedAt', 'green0', 'green1', 'highRedAt'];
-    case 'lower_is_worse': return ['lowRedAt', 'green0', 'green1'];
-    case 'higher_is_worse': return ['green0', 'green1', 'highRedAt'];
+    case 'lower_is_worse': return ['lowRedAt', 'green0'];
+    case 'higher_is_worse': return ['green1', 'highRedAt'];
   }
+}
+
+/** The read-only safe-side green edge of a one-sided entry; null when every edge is editable. */
+export function fixedField(t: ThresholdEntry): BandField | null {
+  if (t.indicativeOnly) return null;
+  if (t.direction === 'lower_is_worse') return 'green1';
+  if (t.direction === 'higher_is_worse') return 'green0';
+  return null;
 }
 
 const NUMERIC = /^-?(\d+\.?\d*|\.\d+)$/;
@@ -32,6 +45,19 @@ export function applyField(band: Band, field: BandField, value: number | null): 
     case 'green0': if (value !== null) next.green[0] = value; break;
     case 'green1': if (value !== null) next.green[1] = value; break;
   }
+  return next;
+}
+
+/**
+ * applyField for a user edit: when the edited green edge reaches the read-only one,
+ * the read-only edge moves along keeping the green width, so the edit stays valid.
+ */
+export function applyEdit(t: ThresholdEntry, band: Band, field: BandField, value: number | null): Band {
+  const next = applyField(band, field, value);
+  const width = band.green[1] - band.green[0];
+  const fixed = fixedField(t);
+  if (fixed === 'green1' && field === 'green0' && next.green[0] >= next.green[1]) next.green[1] = next.green[0] + width;
+  if (fixed === 'green0' && field === 'green1' && next.green[1] <= next.green[0]) next.green[0] = next.green[1] - width;
   return next;
 }
 
@@ -69,11 +95,15 @@ export function fromPercent(pct: number, range: [number, number], step = 0.5): n
   return Math.round(raw / step) * step;
 }
 
-/** Keep a dragged boundary between its adjacent fields; a null neighbour imposes no limit. */
-export function clampForDrag(band: Band, field: BandField, value: number): number {
-  const i = FIELD_ORDER.indexOf(field);
-  const below = i > 0 ? fieldValue(band, FIELD_ORDER[i - 1]) : null;
-  const above = i < FIELD_ORDER.length - 1 ? fieldValue(band, FIELD_ORDER[i + 1]) : null;
+/**
+ * Keep a dragged boundary between its adjacent fields among `fields` (default: all four);
+ * a null neighbour imposes no limit.
+ */
+export function clampForDrag(band: Band, field: BandField, value: number, fields: readonly BandField[] = FIELD_ORDER): number {
+  const order = FIELD_ORDER.filter((f) => fields.includes(f));
+  const i = order.indexOf(field);
+  const below = i > 0 ? fieldValue(band, order[i - 1]) : null;
+  const above = i >= 0 && i < order.length - 1 ? fieldValue(band, order[i + 1]) : null;
   let v = value;
   if (below !== null && v < below) v = below;
   if (above !== null && v > above) v = above;

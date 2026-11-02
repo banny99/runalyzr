@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import type { Band, ThresholdEntry } from '../analysis/index';
 import {
-  applyField, barRange, barSegments, clampForDrag, editableFields, flipSign, fromPercent, parseBoundaryInput, spreadPositions, toPercent,
+  applyEdit, applyField, barRange, barSegments, clampForDrag, editableFields, fixedField, flipSign, fromPercent, parseBoundaryInput,
+  spreadPositions, toPercent,
 } from './rowModel';
 
 const twoSided: ThresholdEntry = { green: [145, 155], amber: [135, 145], amberHigh: [155, 160], unit: '°', direction: 'two_sided' };
@@ -24,9 +25,26 @@ describe('settings row model', () => {
   });
   test('editableFields per direction', () => {
     expect(editableFields(twoSided)).toEqual(['lowRedAt', 'green0', 'green1', 'highRedAt']);
-    expect(editableFields(lowerWorse)).toEqual(['lowRedAt', 'green0', 'green1']);
-    expect(editableFields(higherWorse)).toEqual(['green0', 'green1', 'highRedAt']);
+    expect(editableFields(lowerWorse)).toEqual(['lowRedAt', 'green0']);
+    expect(editableFields(higherWorse)).toEqual(['green1', 'highRedAt']);
     expect(editableFields(indicative)).toEqual([]);
+  });
+  test('fixedField is the safe-side green edge of one-sided entries', () => {
+    expect(fixedField(twoSided)).toBeNull();
+    expect(fixedField(lowerWorse)).toBe('green1');
+    expect(fixedField(higherWorse)).toBe('green0');
+    expect(fixedField(indicative)).toBeNull();
+  });
+  test('applyEdit moves the read-only safe edge along when the editable edge crosses it', () => {
+    const low: Band = { green: [80, 100], lowRedAt: 70, highRedAt: null };
+    expect(applyEdit(lowerWorse, low, 'green0', 90)).toEqual({ green: [90, 100], lowRedAt: 70, highRedAt: null });
+    expect(applyEdit(lowerWorse, low, 'green0', 105)).toEqual({ green: [105, 125], lowRedAt: 70, highRedAt: null });
+    expect(applyEdit(lowerWorse, low, 'green0', 100)).toEqual({ green: [100, 120], lowRedAt: 70, highRedAt: null });
+    const high: Band = { green: [0, 5], lowRedAt: null, highRedAt: 7 };
+    expect(applyEdit(higherWorse, high, 'green1', 3)).toEqual({ green: [0, 3], lowRedAt: null, highRedAt: 7 });
+    expect(applyEdit(higherWorse, high, 'green1', -2)).toEqual({ green: [-7, -2], lowRedAt: null, highRedAt: 7 });
+    const two: Band = { green: [145, 155], lowRedAt: 135, highRedAt: 160 };
+    expect(applyEdit(twoSided, two, 'green0', 160)).toEqual({ green: [160, 155], lowRedAt: 135, highRedAt: 160 });
   });
   test('applyField returns a copy with one field replaced', () => {
     const b: Band = { green: [145, 155], lowRedAt: 135, highRedAt: 160 };
@@ -53,6 +71,12 @@ describe('settings row model', () => {
     expect(clampForDrag(b, 'highRedAt', 150)).toBe(155);
     expect(clampForDrag(b, 'green0', 100)).toBe(135);
     expect(clampForDrag(b, 'green0', 150)).toBe(150);
+  });
+  test('clampForDrag only stops at the editable neighbours it is given', () => {
+    const b: Band = { green: [80, 100], lowRedAt: 70, highRedAt: null };
+    expect(clampForDrag(b, 'green0', 130, ['lowRedAt', 'green0'])).toBe(130);
+    expect(clampForDrag(b, 'green0', 60, ['lowRedAt', 'green0'])).toBe(70);
+    expect(clampForDrag(b, 'green0', 130)).toBe(100);
   });
   test('clampForDrag ignores null neighbours', () => {
     const b: Band = { green: [0, 3], lowRedAt: null, highRedAt: null };

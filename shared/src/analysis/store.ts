@@ -1,5 +1,5 @@
 import type { ThresholdEntry } from './thresholds';
-import { bandFromEntry, entryWithBand, validateBand } from './bands';
+import { bandFromEntry, copyBand, entryWithBand, sameBand, validateBand } from './bands';
 import type { Band } from './bands';
 
 export interface BandStorage {
@@ -45,12 +45,6 @@ function parseBand(raw: unknown): Band | null | undefined {
   return { green: [green[0], green[1]], lowRedAt, highRedAt };
 }
 
-const sameBand = (a: Band | null, b: Band | null): boolean => {
-  if (!a || !b) return a === b;
-  return a.green[0] === b.green[0] && a.green[1] === b.green[1]
-    && a.lowRedAt === b.lowRedAt && a.highRedAt === b.highRedAt;
-};
-
 export function createThresholdStore<K extends string>(
   storageKey: string,
   defaults: Partial<Record<K, ThresholdEntry>>,
@@ -58,8 +52,10 @@ export function createThresholdStore<K extends string>(
 ): ThresholdStore<K> {
   const backing = storage === undefined ? defaultStorage() : storage;
   const listeners = new Set<() => void>();
-  const overrides: Overrides = {};
-  const defaultFor = (key: K): ThresholdEntry | undefined => defaults[key];
+  // Prototype-free so stored keys like "constructor" or "__proto__" are plain data.
+  const overrides: Overrides = Object.create(null);
+  const has = (key: string): boolean => Object.hasOwn(overrides, key);
+  const defaultFor = (key: K): ThresholdEntry | undefined => (Object.hasOwn(defaults, key) ? defaults[key] : undefined);
 
   function load(): void {
     if (!backing) return;
@@ -94,17 +90,35 @@ export function createThresholdStore<K extends string>(
     }
   }
 
-  const notify = (): void => { for (const l of [...listeners]) l(); };
+  const notify = (): void => {
+    for (const l of [...listeners]) {
+      // One failing subscriber must not stop the others from re-rendering.
+      try { l(); } catch (err) { console.error('Threshold store listener failed', err); }
+    }
+  };
 
   function commit(): void {
     persist();
     notify();
   }
 
+  // Another tab saved (or cleared) this store: adopt its state so our next save keeps its edits.
+  if (storage === undefined && backing && typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+      if (e.storageArea !== null && e.storageArea !== backing) return;
+      if (e.key !== null && e.key !== storageKey) return;
+      for (const key of Object.keys(overrides)) delete overrides[key];
+      load();
+      notify();
+    });
+  }
+
   const band = (key: K): Band | null => {
     const def = defaultFor(key);
     if (!def) return null;
-    return key in overrides ? overrides[key] : bandFromEntry(def);
+    if (!has(key)) return bandFromEntry(def);
+    const b = overrides[key];
+    return b && copyBand(b);
   };
   const defaultBand = (key: K): Band | null => {
     const def = defaultFor(key);
@@ -116,7 +130,7 @@ export function createThresholdStore<K extends string>(
   return {
     entry(key) {
       const def = defaultFor(key);
-      if (!def || !(key in overrides)) return def;
+      if (!def || !has(key)) return def;
       return entryWithBand(def, overrides[key]);
     },
     band,
@@ -134,14 +148,15 @@ export function createThresholdStore<K extends string>(
         if (error) return error;
       }
       if (sameBand(normalised(def, next), bandFromEntry(def))) delete overrides[key];
-      else overrides[key] = next;
+      else overrides[key] = next && copyBand(next);
       commit();
       return null;
     },
     addBand(key) {
       const def = defaultFor(key);
       if (!def) return;
-      overrides[key] = { green: def.suggestedGreen ?? [0, 10], lowRedAt: null, highRedAt: null };
+      const [g0, g1] = def.suggestedGreen ?? [0, 10];
+      overrides[key] = { green: [g0, g1], lowRedAt: null, highRedAt: null };
       commit();
     },
     reset(key) {

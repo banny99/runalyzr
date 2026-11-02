@@ -7,6 +7,9 @@ import type { SettingsSection } from './screen';
 
 const DEFAULTS = {
   knee: { green: [145, 155], amber: [135, 145], amberHigh: [155, 160], unit: '°', direction: 'two_sided' },
+  hip: { green: [40, 50], amber: [30, 40], amberHigh: [50, 60], unit: '°', direction: 'two_sided' },
+  cadence: { green: [80, 100], amber: [70, 80], unit: ' rpm', direction: 'lower_is_worse' },
+  drop: { green: [0, 5], amber: [5, 7], unit: '°', direction: 'higher_is_worse' },
   info: noBand('°', [80, 100]),
 } satisfies Record<string, ThresholdEntry>;
 
@@ -235,6 +238,109 @@ describe('threshold settings screen', () => {
     for (const el of inputs) {
       expect(el.type).toBe('text');
       expect(el.inputMode).toBe('decimal');
+    }
+  });
+
+  test('one-sided rows edit only the edges that change a status; the safe green edge is a read-only label', () => {
+    const store = makeStore();
+    open([{ title: 'Ride', store, rows: [{ key: 'cadence', label: 'Cadence' }, { key: 'drop', label: 'Pelvic drop' }] }]);
+    const fields = (key: string) => [...row(key).querySelectorAll<HTMLInputElement>('input')].map((i) => i.dataset.field);
+    const fixed = (key: string) => row(key).querySelector<HTMLElement>('.ts-fixed');
+
+    expect(fields('cadence')).toEqual(['lowRedAt', 'green0']);
+    expect(row('cadence').querySelectorAll('.ts-handle')).toHaveLength(2);
+    expect(fixed('cadence')?.textContent).toBe('100');
+    expect(fixed('cadence')?.querySelector('input, button')).toBeNull();
+
+    expect(fields('drop')).toEqual(['green1', 'highRedAt']);
+    expect(row('drop').querySelectorAll('.ts-handle')).toHaveLength(2);
+    expect(fixed('drop')?.textContent).toBe('0');
+
+    // Moving green past the read-only edge carries it along instead of failing validation.
+    type(input('cadence', 'green0'), '105');
+    expect(store.band('cadence')?.green).toEqual([105, 125]);
+    expect(row('cadence').querySelector('.err')).toBeNull();
+    expect(fixed('cadence')?.textContent).toBe('125');
+  });
+
+  test('two-sided rows have no read-only label', () => {
+    const store = makeStore();
+    open([{ title: 'Ride', store, rows: [{ key: 'knee', label: 'Knee' }] }]);
+    expect(row('knee').querySelector('.ts-fixed')).toBeNull();
+    expect(row('knee').querySelectorAll('input')).toHaveLength(4);
+  });
+
+  test('a store change does not re-measure rows whose band did not change', () => {
+    const store = makeStore();
+    open([{ title: 'Ride', store, rows: [{ key: 'knee', label: 'Knee' }, { key: 'hip', label: 'Hip' }] }]);
+    let reads = 0;
+    const spy = (node: HTMLElement, prop: 'offsetWidth' | 'clientWidth') =>
+      Object.defineProperty(node, prop, { configurable: true, get() { reads++; return 0; } });
+    const watch = (key: string) => {
+      const boxes = row(key).querySelector<HTMLElement>('.ts-boxes');
+      if (!boxes) throw new Error('no boxes');
+      spy(boxes, 'clientWidth');
+      for (const box of row(key).querySelectorAll<HTMLElement>('.ts-box')) spy(box, 'offsetWidth');
+    };
+    watch('hip');
+    type(input('knee', 'green0'), '140');
+    expect(store.band('knee')?.green[0]).toBe(140);
+    expect(reads).toBe(0);
+
+    watch('knee');
+    type(input('knee', 'green0'), '141');
+    expect(reads).toBeGreaterThan(0);
+  });
+
+  test('closing returns focus to the element focused before opening', () => {
+    const opener = document.createElement('button');
+    opener.textContent = 'settings';
+    document.body.appendChild(opener);
+    try {
+      opener.focus();
+      const store = makeStore();
+      open([{ title: 'Ride', store, rows: [{ key: 'knee', label: 'Knee' }] }]);
+      expect(document.activeElement).toBe(document.querySelector('.ts-overlay'));
+      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.querySelector('.ts-overlay')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+    } finally {
+      opener.remove();
+    }
+  });
+
+  test('Tab and Shift+Tab wrap around inside the overlay', () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    try {
+      const store = makeStore();
+      open([{ title: 'Ride', store, rows: [{ key: 'knee', label: 'Knee' }] }]);
+      const overlay = document.querySelector<HTMLElement>('.ts-overlay');
+      if (!overlay) throw new Error('no overlay');
+      const tab = (shiftKey: boolean) => {
+        const e = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+        document.activeElement?.dispatchEvent(e);
+        return e.defaultPrevented;
+      };
+      const first = button(overlay, '← Threshold settings');
+      const last = input('knee', 'highRedAt');
+
+      last.focus();
+      expect(tab(false)).toBe(true);
+      expect(document.activeElement).toBe(first);
+
+      expect(tab(true)).toBe(true);
+      expect(document.activeElement).toBe(last);
+
+      overlay.focus();
+      expect(tab(true)).toBe(true);
+      expect(document.activeElement).toBe(last);
+
+      // In the middle, the browser moves focus as usual.
+      input('knee', 'green0').focus();
+      expect(tab(false)).toBe(false);
+    } finally {
+      outside.remove();
     }
   });
 });

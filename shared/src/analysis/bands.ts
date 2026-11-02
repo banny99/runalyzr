@@ -16,6 +16,14 @@ export interface Band {
 
 const finiteOrNull = (n: number): number | null => (Number.isFinite(n) ? n : null);
 
+export const copyBand = (b: Band): Band => ({ green: [b.green[0], b.green[1]], lowRedAt: b.lowRedAt, highRedAt: b.highRedAt });
+
+export function sameBand(a: Band | null, b: Band | null): boolean {
+  if (!a || !b) return a === b;
+  return a.green[0] === b.green[0] && a.green[1] === b.green[1]
+    && a.lowRedAt === b.lowRedAt && a.highRedAt === b.highRedAt;
+}
+
 /** Green band with amber on both sides running forever — never red. */
 export function greenOnly(green: [number, number], unit: string): TwoSidedThreshold {
   return {
@@ -51,7 +59,8 @@ export function bandFromEntry(t: ThresholdEntry): Band | null {
 
 export function entryWithBand(t: ThresholdEntry, band: Band | null): ThresholdEntry {
   if (!band) return noBand(t.unit, t.suggestedGreen);
-  const { green, lowRedAt, highRedAt } = band;
+  const { lowRedAt, highRedAt } = band;
+  const green: [number, number] = [band.green[0], band.green[1]];
   const low = lowRedAt ?? -Infinity;
   const high = highRedAt ?? Infinity;
   const extra = t.suggestedGreen ? { suggestedGreen: t.suggestedGreen } : {};

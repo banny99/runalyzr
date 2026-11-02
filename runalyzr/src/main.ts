@@ -14,7 +14,7 @@ import { drawPoseSkeleton } from '@runalyzr/shared/skeleton';
 import type { LandmarkArray, AnalysisResults, FrameData, CameraView } from './analysis/types';
 import { runThresholds, RUN_SETTINGS_SECTIONS } from './settings/thresholdStore';
 import { rescoreMetrics } from '@runalyzr/shared/analysis';
-import { openThresholdSettings } from '@runalyzr/shared/settings';
+import { openThresholdSettings, oncePerFrame } from '@runalyzr/shared/settings';
 import { initCameraController } from './ui/cameraController';
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -158,8 +158,8 @@ async function main() {
     updateLiveMetrics(results.cadence?.value ?? null, view, fps);
   }
 
-  // Video file loop
-  const loop = createProcessingLoop(landmarker, video, (landmarks: LandmarkArray) => {
+  // Skeleton (coloured by the last results' statuses) + knee angle labels for one video frame.
+  function drawVideoOverlay(landmarks: LandmarkArray) {
     const statuses = lastResults ? buildJointStatuses(lastResults) : {};
     overlay.drawSkeleton(landmarks, statuses);
     const leftKnee  = angleBetweenThreePoints(
@@ -168,6 +168,11 @@ async function main() {
       landmarks[LANDMARKS.RIGHT_HIP], landmarks[LANDMARKS.RIGHT_KNEE], landmarks[LANDMARKS.RIGHT_ANKLE]);
     overlay.drawAngleLabel(landmarks, LANDMARKS.LEFT_KNEE,  `${leftKnee.toFixed(0)}°`);
     overlay.drawAngleLabel(landmarks, LANDMARKS.RIGHT_KNEE, `${rightKnee.toFixed(0)}°`);
+  }
+
+  // Video file loop
+  const loop = createProcessingLoop(landmarker, video, (landmarks: LandmarkArray) => {
+    drawVideoOverlay(landmarks);
     updateLiveMetrics(null, detectCameraView(landmarks), loop.getFps());
   });
 
@@ -429,12 +434,19 @@ async function main() {
   document.getElementById('settings-btn')?.addEventListener('click', () => {
     openThresholdSettings(RUN_SETTINGS_SECTIONS);
   });
-  // Re-colour the existing results against the new bands (no re-analysis).
-  runThresholds.subscribe(() => {
+  // Re-colour the existing results against the new bands (no re-analysis). The store
+  // fires per typed character / drag step, so the work runs at most once per frame.
+  runThresholds.subscribe(oncePerFrame(() => {
     if (!lastResults) return;
     rescoreMetrics(lastResults, (k) => runThresholds.entry(k));
     renderDashboard(lastResults, generateFindings(lastResults), lastView);
-  });
+    // A paused video keeps the skeleton of its last frame; repaint it in the new colours.
+    // (Playback and the live camera repaint every frame on their own.)
+    if (!cameraActive && !analysing && video.paused) {
+      const lm = loop.getCurrentLandmarks();
+      if (lm) drawVideoOverlay(lm);
+    }
+  }));
 
   // ── Overlay toggle & PDF export ─────────────────────────────────────────
 

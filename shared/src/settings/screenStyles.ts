@@ -60,6 +60,11 @@ export const SETTINGS_CSS = `
   color: inherit; background: transparent; border: 1px solid #8886; border-radius: 4px;
 }
 .ts-box input.err { border-color: #ef4444; background: #ef444422; }
+/* Read-only safe-side green edge of a one-sided metric: past it is green anyway. */
+.ts-fixed {
+  box-sizing: border-box; min-width: 60px; height: 34px; line-height: 34px;
+  justify-content: center; font-size: 16px; opacity: .6;
+}
 /* Signed rows stack ± under its box so four boxes still fit a 320 px phone. */
 .ts-boxes-signed { height: 70px; }
 .ts-box-signed { flex-direction: column; }
@@ -71,6 +76,7 @@ export const SETTINGS_CSS = `
   .ts-overlay button { min-height: 44px; }
   .ts-boxes { height: 44px; }
   .ts-box input { height: 44px; }
+  .ts-fixed { height: 44px; line-height: 44px; }
   .ts-boxes-signed { height: 90px; }
   .ts-overlay .ts-sign { min-height: 44px; }
 }

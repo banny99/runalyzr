@@ -1,7 +1,8 @@
-import type { ThresholdEntry, ThresholdStore } from '../analysis/index';
+import { copyBand, sameBand } from '../analysis/index';
+import type { Band, ThresholdEntry, ThresholdStore } from '../analysis/index';
 import {
-  applyField, barRange, barSegments, clampForDrag, editableFields, fieldValue, flipSign, fromPercent, parseBoundaryInput,
-  spreadPositions, toPercent,
+  applyEdit, barRange, barSegments, clampForDrag, editableFields, FIELD_ORDER, fieldValue, fixedField, flipSign, fromPercent,
+  parseBoundaryInput, spreadPositions, toPercent,
 } from './rowModel';
 import type { BandField } from './rowModel';
 import { SETTINGS_CSS } from './screenStyles';
@@ -60,7 +61,8 @@ function sideLabels(direction: ThresholdEntry['direction'], row: SettingsRow): s
 
 const formatValue = (v: number | null): string => (v === null ? '' : String(v));
 
-interface RowView { root: HTMLElement; update(): void }
+/** `force` re-lays out the row even when its band is unchanged (resize, blur, drag end). */
+interface RowView { root: HTMLElement; update(force?: boolean): void }
 
 function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTMLElement): RowView {
   const { key, signed = false } = row;
@@ -83,6 +85,10 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
   let msg = el('div');
   let handles = new Map<BandField, HTMLElement>();
   let boxes = new Map<BandField, { box: HTMLElement; input: HTMLInputElement }>();
+  // Read-only safe-side green edge of a one-sided entry: shown at its position, never edited.
+  let fixed: { field: BandField; box: HTMLElement } | null = null;
+  // What the bar and boxes were last laid out for; an unchanged row skips the layout reads.
+  let rendered: { band: Band; range: [number, number] } | null = null;
 
   function setError(next: typeof error): void {
     if (error && error.field !== next?.field) boxes.get(error.field)?.input.classList.remove('err');
@@ -94,7 +100,9 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
   function save(field: BandField, value: number | null): void {
     const band = store.band(key);
     if (!band) return;
-    const message = store.set(key, applyField(band, field, value));
+    const entry = store.entry(key);
+    if (!entry) return;
+    const message = store.set(key, applyEdit(entry, band, field, value));
     setError(message ? { field, message } : null);
   }
 
@@ -106,14 +114,15 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
 
   function onDrag(field: BandField, e: PointerEvent): void {
     const band = store.band(key);
+    const entry = store.entry(key);
     const rect = track.getBoundingClientRect();
-    if (!band || !dragRange || rect.width <= 0) return;
+    if (!band || !entry || !dragRange || rect.width <= 0) return;
     const pct = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
     // Dragging a red edge all the way to its end of the bar removes red, like clearing its box.
     const toEnd = (field === 'lowRedAt' && pct <= 0) || (field === 'highRedAt' && pct >= 100);
-    const value = toEnd ? null : clampForDrag(band, field, fromPercent(pct, dragRange));
+    const value = toEnd ? null : clampForDrag(band, field, fromPercent(pct, dragRange), editableFields(entry));
     if (value === fieldValue(band, field)) return;
-    const message = store.set(key, applyField(band, field, value));
+    const message = store.set(key, applyEdit(entry, band, field, value));
     if (!message) setError(null);
   }
 
@@ -136,7 +145,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
       dragField = null;
       dragRange = null;
       handle.classList.remove('ts-dragging');
-      update();
+      update(true);
     };
     handle.addEventListener('pointerup', end);
     handle.addEventListener('pointercancel', end);
@@ -159,7 +168,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
       if (typeof input.scrollIntoView === 'function') input.scrollIntoView({ block: 'center' });
     });
     // Leaving a half-typed box shows the saved value again; an invalid one stays visible until fixed.
-    input.addEventListener('blur', () => { if (error?.field !== field) update(); });
+    input.addEventListener('blur', () => { if (error?.field !== field) update(true); });
     input.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
@@ -182,11 +191,13 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     return { box, input };
   }
 
-  function rebuild(entry: ThresholdEntry | undefined, fields: BandField[]): void {
+  function rebuild(entry: ThresholdEntry | undefined, fields: BandField[], fixedAt: BandField | null): void {
     root.replaceChildren();
     error = null;
     handles = new Map();
     boxes = new Map();
+    fixed = null;
+    rendered = null;
 
     const name = el('div', 'ts-name');
     const title = el('span', '', row.label);
@@ -221,7 +232,13 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     bar = el('div', 'ts-bar');
     track.appendChild(bar);
     boxesEl = el('div', signed ? 'ts-boxes ts-boxes-signed' : 'ts-boxes');
-    for (const field of fields) {
+    for (const field of FIELD_ORDER) {
+      if (field === fixedAt) {
+        fixed = { field, box: el('div', 'ts-box ts-fixed') };
+        boxesEl.appendChild(fixed.box);
+        continue;
+      }
+      if (!fields.includes(field)) continue;
       const handle = buildHandle(field);
       handles.set(field, handle);
       track.appendChild(handle);
@@ -234,14 +251,15 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     root.append(track, boxesEl, legend, msg);
   }
 
-  function update(): void {
+  function update(force = false): void {
     const entry = store.entry(key);
     const band = store.band(key);
     const fields = entry && band ? editableFields(entry) : [];
-    const nextShape = entry ? fields.join(',') : 'missing';
+    const fixedAt = entry && band ? fixedField(entry) : null;
+    const nextShape = entry ? `${fields.join(',')}|${fixedAt ?? ''}` : 'missing';
     if (nextShape !== shape) {
       shape = nextShape;
-      rebuild(entry, fields);
+      rebuild(entry, fields, fixedAt);
     }
     const changed = store.isChanged(key);
     changedEl.textContent = changed ? '● changed' : '';
@@ -250,6 +268,12 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     if (!entry || !band) return;
 
     const range = dragRange ?? barRange(band, signed);
+    // Every store change reaches every row of that store; only rows whose band moved need laying out.
+    // A shown error still re-runs so a reset can clear it.
+    if (!force && !error && rendered && sameBand(rendered.band, band)
+      && rendered.range[0] === range[0] && rendered.range[1] === range[1]) return;
+    rendered = { band: copyBand(band), range };
+
     bar.replaceChildren(...barSegments(entry.direction, band, range).map(([colour, from, to]) => {
       const seg = el('div', `ts-seg ts-${colour}`);
       const left = toPercent(from, range);
@@ -258,10 +282,19 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
       return seg;
     }));
 
+    // Every box on the row, editable or read-only, low to high — they share the spreading below.
+    const placedBoxes: HTMLElement[] = [];
     const pcts: number[] = [];
-    for (const field of fields) {
+    for (const field of FIELD_ORDER) {
       const value = fieldValue(band, field);
       const pct = value === null ? (field === 'lowRedAt' ? 0 : 100) : toPercent(value, range);
+      if (fixed?.field === field) {
+        fixed.box.textContent = formatValue(value);
+        placedBoxes.push(fixed.box);
+        pcts.push(pct);
+        continue;
+      }
+      if (!fields.includes(field)) continue;
       pcts.push(pct);
       const handle = handles.get(field);
       if (handle) handle.style.left = `${pct}%`;
@@ -271,21 +304,19 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
         b.input.value = formatValue(value);
         if (error?.field === field) setError(null);
       }
+      if (b) placedBoxes.push(b.box);
     }
 
     const width = boxesEl.clientWidth;
     let boxWidth = 0;
-    for (const { box } of boxes.values()) if (box.offsetWidth > boxWidth) boxWidth = box.offsetWidth;
+    for (const box of placedBoxes) if (box.offsetWidth > boxWidth) boxWidth = box.offsetWidth;
     const placed = width > 0 && boxWidth > 0
       ? spreadPositions(pcts, ((boxWidth + 4) / width) * 100, (boxWidth / 2 / width) * 100, 100 - (boxWidth / 2 / width) * 100)
       : pcts;
-    fields.forEach((field, i) => {
-      const b = boxes.get(field);
-      if (b) b.box.style.left = `${placed[i]}%`;
-    });
+    placedBoxes.forEach((box, i) => { box.style.left = `${placed[i]}%`; });
   }
 
-  update();
+  update(true);
   return { root, update };
 }
 
@@ -294,6 +325,8 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
   injectStyle();
   const title = opts.title ?? 'Threshold settings';
 
+  // Focus goes back here on close (normally the settings button that opened the overlay).
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const overlay = el('div', 'ts-overlay');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
@@ -325,7 +358,7 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
     }
   }
   // Rows were first laid out off-document; place them again now the bar has a width.
-  for (const view of allViews) view.update();
+  for (const view of allViews) view.update(true);
   overlay.focus({ preventScroll: true });
 
   const unsubscribes = [...viewsByStore].map(([store, views]) =>
@@ -333,19 +366,36 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
 
   resetAll.addEventListener('click', () => { for (const store of viewsByStore.keys()) store.resetAll(); });
 
-  const onResize = (): void => { for (const v of allViews) v.update(); };
+  const onResize = (): void => { for (const v of allViews) v.update(true); };
   window.addEventListener('resize', onResize);
   let closed = false;
   // Modal: keys pressed here must not reach the app's own shortcuts (e.g. Space toggling the video underneath).
   overlay.addEventListener('keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Escape') close();
+    else if (e.key === 'Tab') trapTab(e);
   });
   overlay.addEventListener('keyup', (e) => e.stopPropagation());
   // Keep focus inside the overlay so keys keep landing here after a box loses focus.
   overlay.addEventListener('focusout', (e) => {
     if (!closed && e.relatedTarget === null) overlay.focus({ preventScroll: true });
   });
+
+  /** Tab / Shift+Tab wrap at the ends instead of leaving for the page underneath. */
+  function trapTab(e: KeyboardEvent): void {
+    const focusable = [...overlay.querySelectorAll<HTMLElement>('button, input')]
+      .filter((node) => !(node instanceof HTMLButtonElement && node.disabled) && !node.closest('[hidden]'));
+    if (focusable.length === 0) { e.preventDefault(); return; }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    const target = e.shiftKey
+      ? (active === first || active === overlay ? last : null)
+      : (active === last ? first : null);
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+  }
 
   function close(): void {
     if (closed) return;
@@ -354,6 +404,7 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
     window.removeEventListener('resize', onResize);
     overlay.remove();
     document.body.style.overflow = prevBodyOverflow;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
   }
   back.addEventListener('click', close);
 

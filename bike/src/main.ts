@@ -14,7 +14,7 @@ import { generateSagittalFindings, generateRearFindings, generateFrontFindings }
 import type { Finding } from './analysis/findings';
 import type { RideAnalysisResults, FitSessionResults, MetricToggleState, MetricKey } from './analysis/types';
 import { rideThresholds, fitThresholds, geometryThresholds, BIKE_SETTINGS_SECTIONS } from './settings/thresholdStores';
-import { openThresholdSettings } from '@runalyzr/shared/settings';
+import { openThresholdSettings, oncePerFrame } from '@runalyzr/shared/settings';
 import { rescoreMetrics } from '@runalyzr/shared/analysis';
 import { evaluateSetupChecks } from './analysis/setupChecks';
 import type { FrameData, LandmarkArray } from '@runalyzr/shared/types';
@@ -245,8 +245,9 @@ async function main() {
   document.getElementById('settings-btn')?.addEventListener('click', () => {
     openThresholdSettings(BIKE_SETTINGS_SECTIONS);
   });
-  // Re-colour existing results against the new bands (no re-analysis).
-  rideThresholds.subscribe(() => {
+  // Re-colour existing results against the new bands (no re-analysis). The stores fire
+  // per typed character / drag step, so the work runs at most once per frame.
+  rideThresholds.subscribe(oncePerFrame(() => {
     if (!lastRideResults) return;
     const { sagittal, rear, front } = lastRideResults;
     if (sagittal) rescoreMetrics(sagittal, (k) => rideThresholds.entry(k));
@@ -256,9 +257,11 @@ async function main() {
     lastRearFindings  = rear     ? generateRearFindings(rear)         : [];
     lastFrontFindings = front    ? generateFrontFindings(front)       : [];
     rerenderRideDashboard();
-  });
-  fitThresholds.subscribe(() => fitGuide.refresh());
-  geometryThresholds.subscribe(() => fitGuide.refresh());
+  }));
+  // One coalesced refresh for both stores ("Reset all" changes them in the same frame).
+  const refreshFit = oncePerFrame(() => fitGuide.refresh());
+  fitThresholds.subscribe(refreshFit);
+  geometryThresholds.subscribe(refreshFit);
 
   function rerenderRideDashboard() {
     renderRideDashboard(

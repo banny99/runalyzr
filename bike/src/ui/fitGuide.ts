@@ -6,6 +6,7 @@ import { analyzeImage } from '../pose/processing';
 import { measureFitPosition } from '../analysis/fitMetrics';
 import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
 import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
+import { createGeometryPhotoRefresh } from './geometryPhotoRefresh';
 import { openPointPlacement } from './pointPlacement';
 import { rescoreFitResults } from '../analysis/fitRescore';
 import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
@@ -14,7 +15,10 @@ export interface FitGuideController {
   start: () => void;
   reset: () => void;
   getResults: () => FitSessionResults;
-  /** Re-colours existing results against the current bands and re-renders. Safe with no results. */
+  /**
+   * Re-colours existing results against the current bands and re-renders the tables; the
+   * annotated geometry photos follow once the changes settle. Safe with no results.
+   */
   refresh: () => void;
 }
 
@@ -419,6 +423,29 @@ export function initFitGuide(
     renderResults();
   }
 
+  // Band edits re-render the annotated photos (their angle box bakes in the status colours)
+  // from the raw photo, the same path as the first render.
+  const photoRefresh = createGeometryPhotoRefresh({
+    results: () => bikeGeometryResults,
+    rawPhoto: (stepId) => bikeRawPhotos.get(stepId),
+    step: (stepId) => FIT_STEPS.find((s): s is BikeGeometryStep => s.kind === 'bike' && s.id === stepId),
+    loadImage: (src) => new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Could not reload the photo'));
+      img.src = src;
+    }),
+    render: renderAnnotatedBikePhoto,
+    onDone: () => {
+      renderResults();
+      const step = steps[currentStep];
+      if (!elements.stepUiEl.hidden && step?.kind === 'bike') {
+        const shown = bikeGeometryResults.find((r) => r.stepId === step.id);
+        if (shown) drawDataUrlOnCanvas(elements.canvas, shown.imageDataUrl);
+      }
+    },
+  });
+
   // ── Session navigation ────────────────────────────────────────────────
 
   function buildResults(): FitSessionResults {
@@ -493,6 +520,7 @@ export function initFitGuide(
       positionResults.length = 0;
       bikeGeometryResults.length = 0;
       bikeRawPhotos.clear();
+      photoRefresh.cancel();
       elements.guidePanel.hidden = true;
       elements.positionSelectEl.hidden = true;
       elements.stepUiEl.hidden = true;
@@ -502,6 +530,7 @@ export function initFitGuide(
     refresh() {
       rescoreFitResults(buildResults());
       renderResults();
+      photoRefresh.schedule();
     },
   };
 }

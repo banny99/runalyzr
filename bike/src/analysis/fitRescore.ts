@@ -4,8 +4,9 @@ import { geometryThresholds } from './geometryThresholds';
 import type { FitSessionResults } from './types';
 
 /**
- * Re-derives status and normal-range text from the active Fit bands, in place,
- * so a band edit applies to results that were already measured.
+ * Re-derives status and normal-range text in place from the active bands — Fit
+ * bands for the rider positions, geometry bands for the bike photos — so a band
+ * edit applies to results that were already measured.
  */
 export function rescoreFitResults(results: FitSessionResults): void {
   for (const position of results.positions) {

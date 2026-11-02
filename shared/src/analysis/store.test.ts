@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createThresholdStore } from './store';
 import type { BandStorage } from './store';
 import { evaluateThreshold } from './thresholds';
@@ -108,6 +108,11 @@ describe('createThresholdStore', () => {
     '{"knee":{"green":"x"}}',
     '{"knee":{"green":[150,140],"lowRedAt":null,"highRedAt":null}}',
     '{"gone":null}',
+    '{"knee":{"green":[140,150],"lowRedAt":"x","highRedAt":null}}',
+    '{"knee":{"green":[140,1e999],"lowRedAt":null,"highRedAt":null}}',
+    '{"knee":{"green":[140,150],"lowRedAt":-1e999,"highRedAt":null}}',
+    '{"knee":{"green":[140],"lowRedAt":null,"highRedAt":null}}',
+    '{"knee":{"green":[140,150,160],"lowRedAt":null,"highRedAt":null}}',
   ])('corrupt storage falls back to defaults: %s', (raw) => {
     const store = createThresholdStore(KEY, DEFAULTS, fakeStorage({ [KEY]: raw }));
     expect(store.entry('knee')).toBe(DEFAULTS.knee);
@@ -135,6 +140,52 @@ describe('createThresholdStore', () => {
     for (const s of [a, b]) {
       s.addBand('info');
       expect(s.band('info')).not.toBeNull();
+    }
+  });
+
+  test('prototype-named keys in storage are ignored and never persisted back', () => {
+    const raw = '{"constructor":{"green":[1,2],"lowRedAt":null,"highRedAt":null},"toString":null,"__proto__":null,"hasOwnProperty":null}';
+    const storage = fakeStorage({ [KEY]: raw });
+    const store = createThresholdStore(KEY, DEFAULTS, storage);
+    expect(store.entry('knee')).toBe(DEFAULTS.knee);
+    expect(store.isChanged('knee')).toBe(false);
+    expect(store.isChanged('info')).toBe(false);
+    const band = { green: [140, 150] as [number, number], lowRedAt: 130, highRedAt: null };
+    expect(store.set('knee', band)).toBeNull();
+    expect(Object.keys(JSON.parse(storage.map.get(KEY)!))).toEqual(['knee']);
+  });
+
+  test('bands are copied in and out: callers cannot mutate the store or the defaults', () => {
+    const store = createThresholdStore(KEY, DEFAULTS, fakeStorage());
+    const band = { green: [140, 150] as [number, number], lowRedAt: 130, highRedAt: null };
+    store.set('knee', band);
+    band.green[0] = 0;
+    band.lowRedAt = 1;
+    expect(store.band('knee')).toEqual({ green: [140, 150], lowRedAt: 130, highRedAt: null });
+
+    store.band('knee')!.green[1] = 999;
+    expect(store.band('knee')?.green).toEqual([140, 150]);
+
+    store.addBand('info');
+    store.band('info')!.green[0] = -1;
+    store.entry('info')!.green[0] = -2;
+    expect(store.band('info')?.green).toEqual([80, 100]);
+    expect(DEFAULTS.info.suggestedGreen).toEqual([80, 100]);
+  });
+
+  test('a throwing listener does not stop the others and is reported', () => {
+    const store = createThresholdStore(KEY, DEFAULTS, fakeStorage());
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const seen: string[] = [];
+      store.subscribe(() => { seen.push('a'); });
+      store.subscribe(() => { throw new Error('boom'); });
+      store.subscribe(() => { seen.push('c'); });
+      store.addBand('info');
+      expect(seen).toEqual(['a', 'c']);
+      expect(errors).toHaveBeenCalledTimes(1);
+    } finally {
+      errors.mockRestore();
     }
   });
 });
