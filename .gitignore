@@ -2,3 +2,6 @@ node_modules/
 dist/
 .worktrees/
 .claude/
+
+# tsc output must never sit next to sources (Vite resolves .js before .ts)
+*/src/**/*.js
