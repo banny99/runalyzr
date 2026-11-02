@@ -9,6 +9,7 @@
     "./processing": "./src/pose/processing.ts",
     "./skeleton": "./src/pose/skeleton.ts",
     "./analysis": "./src/analysis/index.ts",
+    "./settings": "./src/settings/index.ts",
     "./pdf": "./src/pdf/renderer.ts"
   },
   "peerDependencies": {
