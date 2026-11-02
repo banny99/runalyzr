@@ -51,7 +51,9 @@ export function calculateSagittalMetrics(
   // Knee flexion at TDC — average left and right
   const leftTDC  = kneeAngleAt(frames, events, 'tdc', 'left');
   const rightTDC = kneeAngleAt(frames, events, 'tdc', 'right');
-  const avgTDC   = leftTDC !== null && rightTDC !== null ? (leftTDC + rightTDC) / 2 : (leftTDC ?? rightTDC);
+  const avgTDCInterior = leftTDC !== null && rightTDC !== null ? (leftTDC + rightTDC) / 2 : (leftTDC ?? rightTDC);
+  // Reported as flexion (180° − interior) to match its label and band.
+  const avgTDC = avgTDCInterior !== null ? 180 - avgTDCInterior : null;
 
   // Hip angle at TDC
   const leftHip  = hipAngleAt(frames, events, 'tdc', 'left');

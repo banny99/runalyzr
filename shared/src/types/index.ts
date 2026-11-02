@@ -20,6 +20,8 @@ export interface MetricResult {
   value: number;
   status: MetricStatus;
   unit: string;
+  /** For flagged two-sided metrics: whether the value is below or above green. */
+  side?: 'low' | 'high';
 }
 
 export interface ReportSection {

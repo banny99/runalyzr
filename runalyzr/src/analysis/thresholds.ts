@@ -5,7 +5,9 @@ import type { ThresholdEntry } from '@runalyzr/shared/analysis';
 // The evaluation engine (green wins at the boundary, half-open amber bands)
 // lives in @runalyzr/shared/analysis — only the table is app-specific.
 export const THRESHOLDS: Record<keyof AnalysisResults, ThresholdEntry> = {
-  kneeFlexionAtContact:  { green: [155, 170], amber: [145, 155], unit: '°',    direction: 'lower_is_worse' },
+  // Interior hip–knee–ankle angle. Two-sided: too bent (<155°) or near-straight
+  // (>170°, heel-strike pattern) are both flagged.
+  kneeFlexionAtContact:  { green: [155, 170], amber: [145, 155], amberHigh: [170, 175], unit: '°', direction: 'two_sided' },
   cadence:               { green: [170, 195], amber: [160, 170], unit: ' spm', direction: 'lower_is_worse' },
   pelvicDrop:            { green: [0, 5],     amber: [5, 7],     unit: '°',    direction: 'higher_is_worse' },
   trunkLateralLean:      { green: [0, 5],     amber: [5, 8],     unit: '°',    direction: 'higher_is_worse' },

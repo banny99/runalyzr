@@ -1,8 +1,11 @@
 import type { MetricResult } from '../types/index';
 
 export interface FindingTemplate {
+  /** One-sided metrics: the risky side. Two-sided metrics: values *below* green. */
   red: string;
   amber: string;
+  /** Two-sided metrics only: text for values *above* green. */
+  high?: { red: string; amber: string };
 }
 
 export interface TemplatedFinding<K extends string = string> {
@@ -27,7 +30,12 @@ export function findingsFromTemplates<K extends string>(
     const template = templates[key];
     if (!template) continue;
     const status = result.status as 'amber' | 'red';
-    findings.push({ metric: key, status, text: template[status].replace('{value}', result.value.toFixed(1)) });
+    // A value above green must get high-side advice or none at all — falling
+    // back to the low-side text would tell a rider with a too-high saddle to
+    // raise it.
+    const texts = result.side === 'high' ? template.high : template;
+    if (!texts) continue;
+    findings.push({ metric: key, status, text: texts[status].replace('{value}', result.value.toFixed(1)) });
   }
 
   return findings.sort((a, b) =>

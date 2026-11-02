@@ -36,19 +36,31 @@ export function calculateAnkleDorsiflexion(
   const L = LANDMARKS;
   const kneeIdx = side === 'left' ? L.LEFT_KNEE : L.RIGHT_KNEE;
   const ankleIdx = side === 'left' ? L.LEFT_ANKLE : L.RIGHT_ANKLE;
+  const heelIdx = side === 'left' ? L.LEFT_HEEL : L.RIGHT_HEEL;
   const footIdx = side === 'left' ? L.LEFT_FOOT_INDEX : L.RIGHT_FOOT_INDEX;
 
   const footstrikes = events.filter((e) => e.type === 'footstrike' && e.foot === side);
   if (footstrikes.length === 0) return null;
 
+  // Dorsiflexion = 90° − angle between the shank (ankle→knee) and the sole
+  // (heel→toe): 0° with a flat foot under a vertical shank, positive with the
+  // toes pulled up. The sole is translated to start at the ankle so the
+  // three-point angle helper measures the angle between the two segments.
   const angles = footstrikes
     .map((e) => frames[e.frameIndex])
     .filter(Boolean)
-    .map((f) =>
-      angleBetweenThreePoints(f.worldLandmarks[kneeIdx], f.worldLandmarks[ankleIdx], f.worldLandmarks[footIdx])
-    );
+    .map((f) => {
+      const w = f.worldLandmarks;
+      const ankle = w[ankleIdx];
+      const soleTip = {
+        x: ankle.x + (w[footIdx].x - w[heelIdx].x),
+        y: ankle.y + (w[footIdx].y - w[heelIdx].y),
+        z: ankle.z + (w[footIdx].z - w[heelIdx].z),
+      };
+      return angleBetweenThreePoints(w[kneeIdx], ankle, soleTip);
+    });
   const avg = angles.reduce((a, b) => a + b, 0) / angles.length;
-  return 180 - avg; // supplementary angle = dorsiflexion degrees
+  return 90 - avg;
 }
 
 export function calculateTrunkLateralLean(
