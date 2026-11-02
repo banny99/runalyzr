@@ -51,4 +51,10 @@ describe('findingsFromTemplates', () => {
     );
     expect(findings.map((f) => f.metric)).toEqual(['b', 'a']);
   });
+
+  it('fallback text is used only for metrics without a template', () => {
+    const metrics: Record<'a' | 'b', MetricResult> = { a: r(1, 'amber'), b: r(2, 'red') };
+    const out = findingsFromTemplates(metrics, { a: { red: 'A red', amber: 'A amber' } }, (k) => `fallback ${k}`);
+    expect(out.map((f) => f.text)).toEqual(['fallback b', 'A amber']);
+  });
 });

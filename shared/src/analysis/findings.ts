@@ -22,14 +22,20 @@ export interface TemplatedFinding<K extends string = string> {
 export function findingsFromTemplates<K extends string>(
   metrics: Partial<Record<K, MetricResult | null>>,
   templates: Partial<Record<K, FindingTemplate>>,
+  /** Text for a non-green metric that has no template (used only then). */
+  fallback?: (key: K, result: MetricResult) => string | undefined,
 ): TemplatedFinding<K>[] {
   const findings: TemplatedFinding<K>[] = [];
 
   for (const [key, result] of Object.entries(metrics) as [K, MetricResult | null][]) {
     if (!result || result.status === 'green' || result.status === 'unknown') continue;
     const template = templates[key];
-    if (!template) continue;
     const status = result.status as 'amber' | 'red';
+    if (!template) {
+      const text = fallback?.(key, result);
+      if (text !== undefined) findings.push({ metric: key, status, text });
+      continue;
+    }
     // A value above green must get high-side advice or none at all — falling
     // back to the low-side text would tell a rider with a too-high saddle to
     // raise it.

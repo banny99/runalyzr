@@ -9,6 +9,8 @@ interface ThresholdBase {
   unit: string;
   /** Shown as a value only — never banded green/amber/red. */
   indicativeOnly?: boolean;
+  /** Starting green for "Add band" on information-only entries. */
+  suggestedGreen?: [number, number];
 }
 
 /** Only one side of green is a fault; beyond amber on the safe side is green. */
