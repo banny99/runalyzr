@@ -35,7 +35,7 @@ export function applyField(band: Band, field: BandField, value: number | null): 
   return next;
 }
 
-function fieldValue(band: Band, field: BandField): number | null {
+export function fieldValue(band: Band, field: BandField): number | null {
   switch (field) {
     case 'lowRedAt': return band.lowRedAt;
     case 'green0': return band.green[0];
