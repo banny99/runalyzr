@@ -7,3 +7,5 @@ export {
   bandFromEntry, entryWithBand, validateBand, formatGreenRange,
   greenOnly, noBand, rescoreMetrics, outOfRangeText,
 } from './bands';
+export { createThresholdStore } from './store';
+export type { ThresholdStore, BandStorage } from './store';
