@@ -32,7 +32,7 @@ const bikeGeometry = {
   imageAspect: 0.75,
   points: [],
   angles: [
-    { id: 'drop', label: 'Bar drop', value: 5, normalRange: '0–10', status: 'green' as const },
+    { id: 'bar_drop_angle' as const, label: 'Bar drop', value: 5, normalRange: '0–10', status: 'green' as const },
   ],
 };
 

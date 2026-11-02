@@ -1,5 +1,6 @@
 import { evaluateThreshold, formatGreenRange } from '@runalyzr/shared/analysis';
 import { fitThresholds } from './fitThresholds';
+import { geometryThresholds } from './geometryThresholds';
 import type { FitSessionResults } from './types';
 
 /**
@@ -12,6 +13,13 @@ export function rescoreFitResults(results: FitSessionResults): void {
       const entry = fitThresholds.entry(m.id);
       m.status = evaluateThreshold(m.value, entry);
       m.normalRange = formatGreenRange(entry) ?? '—';
+    }
+  }
+  for (const geometry of results.bikeGeometry) {
+    for (const a of geometry.angles) {
+      const entry = geometryThresholds.entry(a.id);
+      a.status = evaluateThreshold(a.value, entry);
+      a.normalRange = formatGreenRange(entry) ?? '—';
     }
   }
 }

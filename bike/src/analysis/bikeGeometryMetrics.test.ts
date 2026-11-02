@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { computeBikeAngles, anglePointPairs } from './bikeGeometryMetrics';
 import type { PlacedPoint } from './types';
 import type { AngleDefinition } from '../config/defaults';
+import { geometryThresholds } from './geometryThresholds';
+import type { GeometryAngleId } from './geometryThresholds';
 
 const AR = 4 / 3; // typical landscape aspect ratio for tests
 
@@ -14,7 +16,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'seat_tube_angle', label: 'Seat Tube Angle',
       pointA: 'bb_centre', pointB: 'seat_tube_top',
-      reference: 'horizontal', normalRange: '72–74°',
+      reference: 'horizontal',
     }];
     const result = computeBikeAngles(points, defs, AR);
     expect(result).toHaveLength(1);
@@ -30,7 +32,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'saddle_level', label: 'Saddle Level',
       pointA: 'saddle_left', pointB: 'saddle_right',
-      reference: 'horizontal', normalRange: '< 2°',
+      reference: 'horizontal',
     }];
     expect(computeBikeAngles(points, defs, AR)[0].value).toBeCloseTo(0, 1);
   });
@@ -43,7 +45,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'saddle_tilt', label: 'Saddle Tilt',
       pointA: 'saddle_nose', pointB: 'saddle_centre',
-      reference: 'horizontal', signed: true, normalRange: '±2°',
+      reference: 'horizontal', signed: true,
     }];
     expect(computeBikeAngles(points, defs, AR)[0].value).toBeGreaterThan(0);
   });
@@ -56,7 +58,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'saddle_tilt', label: 'Saddle Tilt',
       pointA: 'saddle_nose', pointB: 'saddle_centre',
-      reference: 'horizontal', signed: true, normalRange: '±2°',
+      reference: 'horizontal', signed: true,
     }];
     expect(computeBikeAngles(points, defs, AR)[0].value).toBeLessThan(0);
   });
@@ -66,7 +68,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'seat_tube_angle', label: 'Seat Tube Angle',
       pointA: 'bb_centre', pointB: 'seat_tube_top',
-      reference: 'horizontal', normalRange: '72–74°',
+      reference: 'horizontal',
     }];
     expect(computeBikeAngles(points, defs, AR)).toHaveLength(0);
   });
@@ -75,7 +77,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'seat_tube_angle', label: 'Seat Tube Angle',
       pointA: 'bb_centre', pointB: 'seat_tube_top',
-      reference: 'horizontal', normalRange: '72–74°',
+      reference: 'horizontal',
     }];
     expect(computeBikeAngles([], defs, AR)).toHaveLength(0);
   });
@@ -86,8 +88,8 @@ describe('computeBikeAngles', () => {
       { id: 'b', x: 0.4, y: 0.2 },
     ];
     const defs: AngleDefinition[] = [{
-      id: 'test', label: 'Test', pointA: 'a', pointB: 'b',
-      reference: 'horizontal', normalRange: '—',
+      id: 'bar_drop_angle', label: 'Test', pointA: 'a', pointB: 'b',
+      reference: 'horizontal',
     }];
     const result = computeBikeAngles(points, defs, AR);
     expect(result[0].value).toBe(parseFloat(result[0].value.toFixed(1)));
@@ -101,7 +103,7 @@ describe('computeBikeAngles', () => {
     const defs: AngleDefinition[] = [{
       id: 'head_tube_angle', label: 'Head Tube Angle',
       pointA: 'ht_bottom', pointB: 'ht_top',
-      reference: 'vertical', normalRange: '71–74°',
+      reference: 'vertical',
     }];
     expect(computeBikeAngles(points, defs, AR)[0].value).toBeCloseTo(0, 1);
   });
@@ -114,8 +116,8 @@ describe('computeBikeAngles', () => {
       { id: 'c', x: 0.8, y: 0.5 },
     ];
     const defs: AngleDefinition[] = [{
-      id: 'corner', label: 'Corner', pointA: 'a', pointB: 'b', pointC: 'c',
-      reference: 'ab_to_c', normalRange: '—',
+      id: 'bar_drop_angle', label: 'Corner', pointA: 'a', pointB: 'b', pointC: 'c',
+      reference: 'ab_to_c',
     }];
     expect(computeBikeAngles(points, defs, 1)[0].value).toBeCloseTo(90, 0);
   });
@@ -131,18 +133,17 @@ describe('computeBikeAngles', () => {
       { id: 'c', x: 0.8, y: 0.8 },
     ];
     const defs: AngleDefinition[] = [{
-      id: 'corner', label: 'Corner', pointA: 'a', pointB: 'b', pointC: 'c',
-      reference: 'ab_to_c', normalRange: '—',
+      id: 'bar_drop_angle', label: 'Corner', pointA: 'a', pointB: 'b', pointC: 'c',
+      reference: 'ab_to_c',
     }];
     expect(computeBikeAngles(points, defs, 2)[0].value).toBeCloseTo(116.6, 1);
   });
 });
 
-describe('computeBikeAngles — status from green band', () => {
-  const defWithBand = (green?: [number, number]): AngleDefinition[] => [{
-    id: 'seat_tube_angle', label: 'Seat Tube Angle',
-    pointA: 'bb_centre', pointB: 'seat_tube_top',
-    reference: 'horizontal', normalRange: '72–74°', green,
+describe('computeBikeAngles — status from the geometry store', () => {
+  afterEach(() => geometryThresholds.resetAll());
+  const defFor = (id: GeometryAngleId, signed?: true): AngleDefinition[] => [{
+    id, label: id, pointA: 'bb_centre', pointB: 'seat_tube_top', reference: 'horizontal', ...(signed ? { signed } : {}),
   }];
   // ~73° tube at AR=1: dx=0.1, |dy|=0.327 → atan2(0.327, 0.1) ≈ 73°
   const points: PlacedPoint[] = [
@@ -151,23 +152,33 @@ describe('computeBikeAngles — status from green band', () => {
   ];
 
   it('marks values inside the band green', () => {
-    expect(computeBikeAngles(points, defWithBand([72, 74]), 1)[0].status).toBe('green');
+    expect(computeBikeAngles(points, defFor('seat_tube_angle'), 1)[0].status).toBe('green');
   });
 
   it('marks values outside the band amber', () => {
-    expect(computeBikeAngles(points, defWithBand([74, 76]), 1)[0].status).toBe('amber');
+    expect(computeBikeAngles(points, defFor('saddle_level'), 1)[0].status).toBe('amber');
   });
 
   it('marks values without a band unknown', () => {
-    expect(computeBikeAngles(points, defWithBand(undefined), 1)[0].status).toBe('unknown');
+    const [m] = computeBikeAngles(points, defFor('bar_drop_angle', true), 1);
+    expect(m.status).toBe('unknown');
+    expect(m.normalRange).toBe('—');
+  });
+
+  it('derives normalRange text from the active band', () => {
+    expect(computeBikeAngles(points, defFor('seat_tube_angle'), 1)[0].normalRange).toBe('72–74°');
+    geometryThresholds.set('seat_tube_angle', { green: [70, 71], lowRedAt: null, highRedAt: null });
+    const [m] = computeBikeAngles(points, defFor('seat_tube_angle'), 1);
+    expect(m.normalRange).toBe('70–71°');
+    expect(m.status).toBe('amber');
   });
 });
 
 describe('anglePointPairs', () => {
   it('derives connection pairs from two-point and three-point definitions', () => {
     const defs: AngleDefinition[] = [
-      { id: 'x', label: 'X', pointA: 'a', pointB: 'b', reference: 'horizontal', normalRange: '—' },
-      { id: 'y', label: 'Y', pointA: 'p', pointB: 'q', pointC: 'r', reference: 'ab_to_c', normalRange: '—' },
+      { id: 'saddle_level', label: 'X', pointA: 'a', pointB: 'b', reference: 'horizontal' },
+      { id: 'bar_level', label: 'Y', pointA: 'p', pointB: 'q', pointC: 'r', reference: 'ab_to_c' },
     ];
     expect(anglePointPairs(defs)).toEqual([['a', 'b'], ['p', 'q'], ['q', 'r']]);
   });

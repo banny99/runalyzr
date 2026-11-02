@@ -1,12 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FIT_THRESHOLDS, fitThresholds } from './fitThresholds';
 import type { FitMetricId } from './fitThresholds';
+import { geometryThresholds } from './geometryThresholds';
 import { rescoreFitResults } from './fitRescore';
 import { measureSide3OClock, measureSide6OClock, measureSide9OClock, measureRear6OClock, measureFront6OClock } from './fitMetrics';
 import { evaluateThreshold } from '@runalyzr/shared/analysis';
 import { LANDMARKS } from '../config/defaults';
 import type { LandmarkArray } from '@runalyzr/shared/types';
-import type { FitMeasurement, FitPositionResult, FitSessionResults } from './types';
+import type { BikeGeometryResult, FitMeasurement, FitPositionResult, FitSessionResults } from './types';
 
 const L = LANDMARKS;
 const lm = (x: number, y: number) => ({ x, y, z: 0, visibility: 1 });
@@ -33,7 +34,7 @@ function position(id: string, measurements: FitMeasurement[]): FitPositionResult
   };
 }
 
-afterEach(() => fitThresholds.resetAll());
+afterEach(() => { fitThresholds.resetAll(); geometryThresholds.resetAll(); });
 
 describe('fit defaults', () => {
   it('reproduce today: green inside, amber outside, never red', () => {
@@ -101,5 +102,25 @@ describe('rescoreFitResults', () => {
     fitThresholds.set('reachAngle', { green: [0, 90], lowRedAt: null, highRedAt: null });
     rescoreFitResults(results);
     for (const m of reach()) { expect(m.status).toBe('green'); expect(m.normalRange).toBe('0–90°'); }
+  });
+});
+
+describe('rescoreFitResults — bike geometry', () => {
+  it('re-colours geometry angles after a change', () => {
+    const geo: BikeGeometryResult = {
+      stepId: 'bike_side', stepName: 'Full Bike Side View', imageDataUrl: '', imageAspect: 1, points: [],
+      angles: [
+        { id: 'seat_tube_angle', label: 'Seat Tube Angle', value: 73, normalRange: '72–74°', status: 'green' },
+        { id: 'bar_drop_angle', label: 'Bar Drop', value: 5, normalRange: '—', status: 'unknown' },
+      ],
+    };
+    const results: FitSessionResults = { positions: [], bikeGeometry: [geo] };
+    geometryThresholds.set('seat_tube_angle', { green: [60, 65], lowRedAt: null, highRedAt: 70 });
+    geometryThresholds.addBand('bar_drop_angle');
+    rescoreFitResults(results);
+    expect(geo.angles[0].status).toBe('red');
+    expect(geo.angles[0].normalRange).toBe('60–65°');
+    expect(geo.angles[1].status).toBe('green');
+    expect(geo.angles[1].normalRange).toBe('0–10°');
   });
 });

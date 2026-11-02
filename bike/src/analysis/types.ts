@@ -1,4 +1,5 @@
 import type { FitMetricId } from './fitThresholds';
+import type { GeometryAngleId } from './geometryThresholds';
 import type { MetricResult, MetricStatus, LandmarkArray } from '@runalyzr/shared/types';
 export type { CameraView, MetricStatus, MetricResult, Landmark, LandmarkArray, FrameData } from '@runalyzr/shared/types';
 
@@ -70,11 +71,11 @@ export interface PlacedPoint {
 }
 
 export interface BikeAngleMeasurement {
-  id: string;
+  id: GeometryAngleId;
   label: string;
   value: number;      // degrees, rounded to 1 dp
   normalRange: string;
-  status: MetricStatus; // green inside the default band, amber outside, unknown when no band
+  status: MetricStatus; // green inside the active band, amber outside, unknown when no band
 }
 
 export interface BikeGeometryResult {
