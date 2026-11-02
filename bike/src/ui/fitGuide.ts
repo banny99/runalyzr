@@ -7,12 +7,15 @@ import { measureFitPosition } from '../analysis/fitMetrics';
 import { computeBikeAngles } from '../analysis/bikeGeometryMetrics';
 import { renderAnnotatedBikePhoto } from './annotatedBikePhoto';
 import { openPointPlacement } from './pointPlacement';
+import { rescoreFitResults } from '../analysis/fitRescore';
 import type { FitPositionResult, FitSessionResults, BikeGeometryResult, PlacedPoint } from '../analysis/types';
 
 export interface FitGuideController {
   start: () => void;
   reset: () => void;
   getResults: () => FitSessionResults;
+  /** Re-colours existing results against the current bands and re-renders. Safe with no results. */
+  refresh: () => void;
 }
 
 export function initFitGuide(
@@ -496,5 +499,9 @@ export function initFitGuide(
       renderResults();
     },
     getResults: buildResults,
+    refresh() {
+      rescoreFitResults(buildResults());
+      renderResults();
+    },
   };
 }

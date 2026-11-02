@@ -13,6 +13,9 @@ import { calculateFrontMetrics } from './analysis/metrics/front';
 import { generateSagittalFindings, generateRearFindings, generateFrontFindings } from './analysis/findings';
 import type { Finding } from './analysis/findings';
 import type { RideAnalysisResults, FitSessionResults, MetricToggleState, MetricKey } from './analysis/types';
+import { rideThresholds, fitThresholds, geometryThresholds, BIKE_SETTINGS_SECTIONS } from './settings/thresholdStores';
+import { openThresholdSettings } from '@runalyzr/shared/settings';
+import { rescoreMetrics } from '@runalyzr/shared/analysis';
 import { evaluateSetupChecks } from './analysis/setupChecks';
 import type { FrameData, LandmarkArray } from '@runalyzr/shared/types';
 
@@ -236,6 +239,26 @@ async function main() {
       if (frames.length >= 30) runRideAnalysis(frames);
     });
   });
+
+  // ── Threshold settings ──────────────────────────────────────────────────
+
+  document.getElementById('settings-btn')?.addEventListener('click', () => {
+    openThresholdSettings(BIKE_SETTINGS_SECTIONS);
+  });
+  // Re-colour existing results against the new bands (no re-analysis).
+  rideThresholds.subscribe(() => {
+    if (!lastRideResults) return;
+    const { sagittal, rear, front } = lastRideResults;
+    if (sagittal) rescoreMetrics(sagittal, (k) => rideThresholds.entry(k));
+    if (rear)     rescoreMetrics(rear,     (k) => rideThresholds.entry(k));
+    if (front)    rescoreMetrics(front,    (k) => rideThresholds.entry(k));
+    lastSagFindings   = sagittal ? generateSagittalFindings(sagittal) : [];
+    lastRearFindings  = rear     ? generateRearFindings(rear)         : [];
+    lastFrontFindings = front    ? generateFrontFindings(front)       : [];
+    rerenderRideDashboard();
+  });
+  fitThresholds.subscribe(() => fitGuide.refresh());
+  geometryThresholds.subscribe(() => fitGuide.refresh());
 
   function rerenderRideDashboard() {
     renderRideDashboard(
