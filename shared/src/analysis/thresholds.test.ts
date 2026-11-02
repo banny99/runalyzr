@@ -41,6 +41,35 @@ describe('evaluateThreshold', () => {
   });
 });
 
+describe('evaluateThreshold — two-sided bands', () => {
+  // Modelled on bike knee extension at BDC: too little extension (saddle low)
+  // and too much (saddle high) are both faults.
+  const twoSided: ThresholdEntry = {
+    green: [145, 155], amber: [135, 145], amberHigh: [155, 160], unit: '°', direction: 'two_sided',
+  };
+
+  it('flags values above green instead of falling through to green', () => {
+    expect(evaluateThreshold(158, twoSided)).toBe('amber');
+    expect(evaluateThreshold(165, twoSided)).toBe('red');
+  });
+
+  it('still flags the low side', () => {
+    expect(evaluateThreshold(140, twoSided)).toBe('amber');
+    expect(evaluateThreshold(130, twoSided)).toBe('red');
+  });
+
+  it('green wins at both boundaries', () => {
+    expect(evaluateThreshold(145, twoSided)).toBe('green');
+    expect(evaluateThreshold(155, twoSided)).toBe('green');
+  });
+
+  it('records which side of green a flagged value is on', () => {
+    expect(thresholdMetricResult(158, twoSided).side).toBe('high');
+    expect(thresholdMetricResult(130, twoSided).side).toBe('low');
+    expect(thresholdMetricResult(150, twoSided).side).toBeUndefined();
+  });
+});
+
 describe('thresholdMetricResult', () => {
   it('carries the value, evaluated status and unit', () => {
     expect(thresholdMetricResult(165, lowerWorse)).toEqual({ value: 165, status: 'amber', unit: ' spm' });

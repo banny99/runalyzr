@@ -9,13 +9,16 @@ type AllMetricKeys = keyof SagittalMetrics | keyof RearMetrics | keyof FrontMetr
 // lives in @runalyzr/shared/analysis — only the table is app-specific.
 export const THRESHOLDS: Partial<Record<AllMetricKeys, ThresholdEntry>> = {
   // Sagittal
-  kneeExtensionBDC:       { green: [145, 155], amber: [135, 145], unit: '°',     direction: 'lower_is_worse' },
-  kneeFlexionTDC:         { green: [100, 120], amber: [85,  100], unit: '°',     direction: 'lower_is_worse' },
+  // Two-sided: a saddle can be too low (knee too bent) or too high (knee too straight).
+  kneeExtensionBDC:       { green: [145, 155], amber: [135, 145], amberHigh: [155, 160], unit: '°', direction: 'two_sided' },
+  // Flexion = 180° − interior angle. >120° compressed (saddle low / long cranks); <100° open (saddle high).
+  kneeFlexionTDC:         { green: [100, 120], amber: [85,  100], amberHigh: [120, 130], unit: '°', direction: 'two_sided' },
   hipAngleTDC:            { green: [60,  90],  amber: [45,  60],  unit: '°',     direction: 'lower_is_worse' },
   hipVerticalOscillation: { green: [0,   1.5], amber: [1.5, 3],   unit: '% frame', direction: 'higher_is_worse' },
   torsoAngle:             { green: [35,  50],  amber: [25,  35],  unit: '°',     direction: 'lower_is_worse' },
   pelvicTilt:             { green: [0,   3],   amber: [3,   6],   unit: ' cm',   direction: 'higher_is_worse' },
-  elbowAngle:             { green: [90,  160], amber: [70,  90],  unit: '°',     direction: 'lower_is_worse' },
+  // Two-sided: very bent (cramped cockpit) or locked straight (reach too long).
+  elbowAngle:             { green: [90,  160], amber: [70,  90],  amberHigh: [160, 170], unit: '°', direction: 'two_sided' },
   shoulderAngle:          { green: [0, 999],   amber: [0,   0],   unit: '°',     direction: 'higher_is_worse', indicativeOnly: true },
   reachAngle:             { green: [0, 999],   amber: [0,   0],   unit: '°',     direction: 'higher_is_worse', indicativeOnly: true },
   wristAngle:             { green: [0,   10],  amber: [10,  20],  unit: '°',     direction: 'higher_is_worse' },

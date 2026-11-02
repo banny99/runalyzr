@@ -23,6 +23,27 @@ describe('findingsFromTemplates', () => {
     expect(findingsFromTemplates({ nope: r(9, 'red') }, templates)).toHaveLength(0);
   });
 
+  it('uses the high-side text for a two-sided metric flagged above green', () => {
+    const twoSided = {
+      knee: {
+        red: 'Too bent {value}', amber: 'Bit bent {value}',
+        high: { red: 'Too straight {value}', amber: 'Bit straight {value}' },
+      },
+    };
+    const findings = findingsFromTemplates(
+      { knee: { value: 165, status: 'red', unit: '°', side: 'high' } }, twoSided,
+    );
+    expect(findings.map((f) => f.text)).toEqual(['Too straight 165.0']);
+  });
+
+  it('never shows low-side advice for a high-side value when no high text exists', () => {
+    // Showing "raise the saddle" for a saddle that is too high is the bug this guards.
+    const findings = findingsFromTemplates(
+      { a: { value: 9, status: 'red', unit: '°', side: 'high' } }, templates,
+    );
+    expect(findings).toHaveLength(0);
+  });
+
   it('sorts red before amber, keeping insertion order within a status', () => {
     const findings = findingsFromTemplates(
       { a: r(1, 'amber'), b: r(2, 'red') },

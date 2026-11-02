@@ -2,6 +2,8 @@ import { generateReport as _generateReport } from '@runalyzr/shared/pdf';
 import type { ReportSection } from '@runalyzr/shared/types';
 import { METRIC_LABELS, APP_NAME } from '../config/defaults';
 import { THRESHOLDS } from '../analysis/thresholds';
+import { generateSagittalFindings, generateRearFindings, generateFrontFindings } from '../analysis/findings';
+import type { Finding } from '../analysis/findings';
 import type {
   BikeReportParams,
   MetricToggleState,
@@ -35,14 +37,19 @@ export function buildReportSections(params: BikeReportParams): ReportSection[] {
   // Ride sections
   if (params.rideResults) {
     const { sagittal, rear, front } = params.rideResults;
+    // Findings follow the same metric toggles as the table rows.
+    const enabled: Partial<Record<string, boolean>> = params.enabledMetrics;
+    const texts = (findings: Finding[]): string[] => findings
+      .filter((f) => enabled[f.metric] !== false)
+      .map((f) => f.text);
     if (sagittal) {
-      sections.push(buildSection('Sagittal (Side) View', sagittal, [], params.enabledMetrics));
+      sections.push(buildSection('Sagittal (Side) View', sagittal, texts(generateSagittalFindings(sagittal)), params.enabledMetrics));
     }
     if (rear) {
-      sections.push(buildSection('Rear View', rear, [], params.enabledMetrics));
+      sections.push(buildSection('Rear View', rear, texts(generateRearFindings(rear)), params.enabledMetrics));
     }
     if (front) {
-      sections.push(buildSection('Front View', front, [], params.enabledMetrics));
+      sections.push(buildSection('Front View', front, texts(generateFrontFindings(front)), params.enabledMetrics));
     }
   }
 

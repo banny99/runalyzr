@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildReportSections } from './pdfGenerator';
 import type { BikeReportParams } from '../analysis/types';
+import { makeMetricResult } from '../analysis/thresholds';
 
 function paramsWith(fit: BikeReportParams['fitResults']): BikeReportParams {
   return {
@@ -62,5 +63,33 @@ describe('buildReportSections', () => {
       paramsWith({ positions: [riderPosition], bikeGeometry: [bikeGeometry] }),
     );
     expect(sections.filter((s) => s.image).length).toBe(2);
+  });
+});
+
+describe('buildReportSections — ride findings', () => {
+  const sagittal = {
+    kneeExtensionBDC: makeMetricResult(165, 'kneeExtensionBDC'), // red, saddle too high
+    kneeFlexionTDC: null, hipAngleTDC: null, hipVerticalOscillation: null,
+    torsoAngle: null, pelvicTilt: null, elbowAngle: null, shoulderAngle: null,
+    reachAngle: null, wristAngle: null, ankleAnkling: null, cadence: null,
+  };
+
+  it('puts the ride findings into the PDF section, not an empty list', () => {
+    const sections = buildReportSections({
+      clientName: 'Test', notes: '', fitResults: null, enabledMetrics: {},
+      rideResults: { sagittal, rear: null, front: null },
+    });
+    const side = sections.find((s) => s.title.startsWith('Sagittal'));
+    expect(side!.findings).toHaveLength(1);
+    expect(side!.findings[0]).toMatch(/lower the saddle/i);
+  });
+
+  it('leaves out findings for metrics the fitter switched off', () => {
+    const sections = buildReportSections({
+      clientName: 'Test', notes: '', fitResults: null,
+      enabledMetrics: { kneeExtensionBDC: false },
+      rideResults: { sagittal, rear: null, front: null },
+    });
+    expect(sections.find((s) => s.title.startsWith('Sagittal'))!.findings).toHaveLength(0);
   });
 });

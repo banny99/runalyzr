@@ -26,6 +26,27 @@ function angle(wlm: LandmarkArray, a: number, b: number, c: number): number {
   return angleBetweenThreePoints(wlm[a], wlm[b], wlm[c]);
 }
 
+type Side = 'left' | 'right';
+
+const SIDE = {
+  left:  { SHOULDER: L.LEFT_SHOULDER,  ELBOW: L.LEFT_ELBOW,  WRIST: L.LEFT_WRIST,
+           HIP: L.LEFT_HIP,  KNEE: L.LEFT_KNEE,  ANKLE: L.LEFT_ANKLE },
+  right: { SHOULDER: L.RIGHT_SHOULDER, ELBOW: L.RIGHT_ELBOW, WRIST: L.RIGHT_WRIST,
+           HIP: L.RIGHT_HIP, KNEE: L.RIGHT_KNEE, ANKLE: L.RIGHT_ANKLE },
+} as const;
+
+/**
+ * The side facing the camera in a side-view photo: the one MediaPipe sees
+ * more clearly (far-side limbs are occluded and get low visibility). Ties —
+ * including landmarks without visibility — go to the right side, which is
+ * where the setup instructions place the camera.
+ */
+export function nearSide(wlm: LandmarkArray): Side {
+  const score = (side: Side): number =>
+    Object.values(SIDE[side]).reduce((sum, i) => sum + (wlm[i]?.visibility ?? 0), 0);
+  return score('left') > score('right') ? 'left' : 'right';
+}
+
 /**
  * Frontal-plane (x–y) deviation of the knee from the hip–ankle line, in
  * degrees (0° = neutral). Knee flexion lives in the depth axis, so this
@@ -47,10 +68,11 @@ function kneeFrontalDeviation(hip: Landmark, knee: Landmark, ankle: Landmark): n
  * Returns [] when the arm/torso landmarks aren't available.
  */
 export function sideUpperBody(wlm: LandmarkArray): FitMeasurement[] {
-  const ls = wlm[L.LEFT_SHOULDER];
-  const lh = wlm[L.LEFT_HIP];
-  const le = wlm[L.LEFT_ELBOW];
-  const lw = wlm[L.LEFT_WRIST];
+  const S = SIDE[nearSide(wlm)];
+  const ls = wlm[S.SHOULDER];
+  const lh = wlm[S.HIP];
+  const le = wlm[S.ELBOW];
+  const lw = wlm[S.WRIST];
 
   // Each angle is emitted independently so a missing hand (common at the
   // 9 o'clock back-pedal phase, where the forearm is often occluded) doesn't
@@ -69,18 +91,22 @@ export function sideUpperBody(wlm: LandmarkArray): FitMeasurement[] {
 export function measureSide6OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!wlm[L.LEFT_HIP] || !wlm[L.LEFT_KNEE] || !wlm[L.LEFT_ANKLE] ||
       !wlm[L.RIGHT_HIP] || !wlm[L.RIGHT_KNEE] || !wlm[L.RIGHT_ANKLE]) return [];
+  // Only one crank is at 6 o'clock (the other leg is at the top of the
+  // stroke), so measure the leg whose ankle is lowest — world y increases
+  // downward.
+  const S = wlm[L.LEFT_ANKLE].y > wlm[L.RIGHT_ANKLE].y ? SIDE.left : SIDE.right;
   return [
-    entry('Knee Extension at BDC',     angle(wlm, L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE),    '145–155°', [145, 155]),
-    entry('Knee Extension at BDC (R)', angle(wlm, L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE), '145–155°', [145, 155]),
+    entry('Knee Extension at BDC', angle(wlm, S.HIP, S.KNEE, S.ANKLE), '145–155°', [145, 155]),
     ...sideUpperBody(wlm),
   ];
 }
 
 export function measureSide3OClock(wlm: LandmarkArray): FitMeasurement[] {
-  const ls = wlm[L.LEFT_SHOULDER];
-  const lh = wlm[L.LEFT_HIP];
-  const lk = wlm[L.LEFT_KNEE];
-  const la = wlm[L.LEFT_ANKLE];
+  const S = SIDE[nearSide(wlm)];
+  const ls = wlm[S.SHOULDER];
+  const lh = wlm[S.HIP];
+  const lk = wlm[S.KNEE];
+  const la = wlm[S.ANKLE];
   if (!ls || !lh || !lk || !la) return [];
 
   // KOPS expressed as an angle: how far the knee–ankle (shank) line leans
@@ -88,31 +114,33 @@ export function measureSide3OClock(wlm: LandmarkArray): FitMeasurement[] {
   // shank ≈ 1.4°, so the classic 0–10 mm window is roughly 0–2°.
   return [
     entry('Shank Angle (KOPS)',      lateralAngle(lk, la),                                 '0–2°',   [0, 2]),
-    entry('Hip Angle at 3 o\'clock', angle(wlm, L.LEFT_SHOULDER, L.LEFT_HIP, L.LEFT_KNEE), '45–65°', [45, 65]),
+    entry('Hip Angle at 3 o\'clock', angle(wlm, S.SHOULDER, S.HIP, S.KNEE),             '45–65°', [45, 65]),
     ...sideUpperBody(wlm),
   ];
 }
 
 export function measureSide9OClock(wlm: LandmarkArray): FitMeasurement[] {
-  if (!wlm[L.LEFT_KNEE] || !wlm[L.LEFT_HIP] || !wlm[L.LEFT_SHOULDER]) return [];
+  const S = SIDE[nearSide(wlm)];
+  if (!wlm[S.KNEE] || !wlm[S.HIP] || !wlm[S.SHOULDER]) return [];
   // Torso lean (formerly the standalone "Back Angle" here) now comes from
   // sideUpperBody, so it's reported uniformly across all side positions.
   return [
-    entry('Hip Extension at 9 o\'clock', angle(wlm, L.LEFT_KNEE, L.LEFT_HIP, L.LEFT_SHOULDER), '160–180°', [160, 180]),
+    entry('Hip Extension at 9 o\'clock', angle(wlm, S.KNEE, S.HIP, S.SHOULDER), '160–180°', [160, 180]),
     ...sideUpperBody(wlm),
   ];
 }
 
 export function measureSideAero(wlm: LandmarkArray): FitMeasurement[] {
-  const le = wlm[L.LEFT_ELBOW];
-  const lw = wlm[L.LEFT_WRIST];
-  const ls = wlm[L.LEFT_SHOULDER];
+  const S = SIDE[nearSide(wlm)];
+  const le = wlm[S.ELBOW];
+  const lw = wlm[S.WRIST];
+  const ls = wlm[S.SHOULDER];
   if (!le || !lw || !ls) return [];
 
   const reachAngle = Math.abs((Math.atan2(Math.abs(ls.x - lw.x), Math.abs(ls.y - lw.y)) * 180) / Math.PI);
 
   return [
-    entry('Elbow Angle (aero)', angle(wlm, L.LEFT_SHOULDER, L.LEFT_ELBOW, L.LEFT_WRIST), '80–110°', [80, 110]),
+    entry('Elbow Angle (aero)', angle(wlm, S.SHOULDER, S.ELBOW, S.WRIST),             '80–110°', [80, 110]),
     entry('Reach Angle',        reachAngle,                                              '15–35°',  [15, 35]),
   ];
 }

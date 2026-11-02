@@ -4,8 +4,13 @@ import type { FindingTemplate } from '@runalyzr/shared/analysis';
 
 const FINDING_TEMPLATES: Partial<Record<keyof AnalysisResults, FindingTemplate>> = {
   kneeFlexionAtContact: {
-    red: 'Knee is nearly fully extended at initial contact ({value}°), indicating significant heel striking. Consider increasing cadence and landing with greater knee flexion.',
-    amber: 'Knee flexion at initial contact ({value}°) is slightly below optimal. Minor adjustment to footstrike pattern may be beneficial.',
+    // Low side: smaller interior angle = more bent knee.
+    red: 'Knee is heavily flexed at initial contact ({value}°). This can indicate a crouched running posture or fatigue; hip and quadriceps strength work may help.',
+    amber: 'Knee is slightly more flexed than typical at initial contact ({value}°).',
+    high: {
+      red: 'Knee is nearly fully extended at initial contact ({value}°), indicating significant heel striking. Consider increasing cadence and landing with greater knee flexion.',
+      amber: 'Knee is slightly straighter than optimal at initial contact ({value}°). A small cadence increase can encourage a softer landing.',
+    },
   },
   pelvicDrop: {
     red: 'Contralateral pelvic drop of {value}° during stance phase exceeds normal range, suggesting hip abductor weakness. Hip strengthening exercises recommended.',

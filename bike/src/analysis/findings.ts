@@ -6,15 +6,23 @@ type Finding = TemplatedFinding;
 
 const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
   kneeExtensionBDC: {
-    red:   'Knee extension at BDC is {value}° — significantly beyond normal range. Raise the saddle to allow more extension, or check cleat position.',
-    amber: 'Knee extension at BDC is {value}° — slightly outside normal range. Minor saddle height adjustment may help.',
+    red:   'Knee extension at BDC is {value}° — the knee stays too bent at the bottom of the stroke. The saddle is likely too low: raise the saddle, or check cleat position.',
+    amber: 'Knee extension at BDC is {value}° — slightly too bent at the bottom of the stroke. A small saddle raise may help.',
+    high: {
+      red:   'Knee extension at BDC is {value}° — the leg is nearly straight at the bottom of the stroke. The saddle is likely too high: lower the saddle, and watch for hip rocking or toes reaching down.',
+      amber: 'Knee extension at BDC is {value}° — slightly over-extended at the bottom of the stroke. A small saddle drop may help.',
+    },
   },
   kneeFlexionTDC: {
-    red:   'Knee flexion at TDC is {value}° — very compressed at top of stroke. Lower the saddle or adjust fore/aft position.',
-    amber: 'Knee flexion at TDC is {value}° — slightly tight at top of stroke.',
+    red:   'Knee flexion at TDC is only {value}° — the knee is unusually open at the top of the stroke. Check that the saddle is not too high (compare with knee extension at BDC).',
+    amber: 'Knee flexion at TDC is {value}° — slightly open at the top of the stroke.',
+    high: {
+      red:   'Knee flexion at TDC is {value}° — very compressed at the top of the stroke. The saddle may be too low (raise it, checking knee extension at BDC) or the cranks too long.',
+      amber: 'Knee flexion at TDC is {value}° — slightly tight at the top of the stroke.',
+    },
   },
   hipAngleTDC: {
-    red:   'Hip angle at TDC is {value}° — hip is closing too tightly. Lower the saddle or increase saddle setback.',
+    red:   'Hip angle at TDC is {value}° — the hip closes too tightly at the top of the stroke. Raise the handlebars or shorten the reach, and check the saddle is not too low.',
     amber: 'Hip angle at TDC is {value}° — hip is slightly restricted at top of stroke.',
   },
   hipVerticalOscillation: {
@@ -26,8 +34,12 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
     amber: 'Torso angle of {value}° is slightly outside optimal range.',
   },
   elbowAngle: {
-    red:   'Elbow angle of {value}° suggests reach issues. Review stem length and handlebar position.',
-    amber: 'Elbow angle of {value}° is slightly outside optimal range.',
+    red:   'Elbow angle of {value}° is very bent — the cockpit may be too short or low. Review stem length and handlebar position.',
+    amber: 'Elbow angle of {value}° is slightly more bent than optimal.',
+    high: {
+      red:   'Elbow angle of {value}° — arms are nearly locked. Reach is likely too long: consider a shorter stem or higher bars, and keep a slight bend in the elbows.',
+      amber: 'Elbow angle of {value}° — arms are close to straight. Keep a slight bend in the elbows.',
+    },
   },
   wristAngle: {
     red:   'Wrist deviation of {value}° is significant — review handlebar width and brake lever position.',

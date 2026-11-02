@@ -3,7 +3,9 @@ import {
   measureRear6OClock,
   measureFront6OClock,
   measureSide3OClock,
+  measureSide6OClock,
   sideUpperBody,
+  nearSide,
 } from './fitMetrics';
 import { LANDMARKS } from '../config/defaults';
 import type { LandmarkArray } from '@runalyzr/shared/types';
@@ -43,13 +45,14 @@ function symmetricRider(): LandmarkArray {
 }
 
 describe('sideUpperBody — torso / elbow / reach / shoulder', () => {
-  // Clean left-side geometry with right-angle joints for exact expectations.
-  const sideRider = world({
+  // Clean left-side geometry with right-angle joints for exact expectations,
+  // filmed from the left (right side occluded, so left is the near side).
+  const sideRider = occlude(world({
     [L.LEFT_SHOULDER]: lm(0, -0.5),
     [L.LEFT_HIP]:      lm(0, 0),      // torso straight down → 0° from vertical
     [L.LEFT_ELBOW]:    lm(0.5, -0.5), // shoulder→elbow→wrist right angle
     [L.LEFT_WRIST]:    lm(0.5, 0),    // shoulder→wrist at 45° from vertical
-  });
+  }), 'right');
 
   it('reports the four upper-body angles with expected values', () => {
     const r = sideUpperBody(sideRider);
@@ -144,9 +147,53 @@ describe('measureSide3OClock — shank angle (KOPS)', () => {
 
   it('reports the forward lean of the shank', () => {
     const wlm = symmetricRider();
-    wlm[L.LEFT_KNEE] = lm(-0.05, 0.4); // knee 0.05 m forward of ankle, 0.4 m up ≈ 7.1°
+    // Near (right, the default) knee 0.05 m forward of ankle, 0.4 m up ≈ 7.1°
+    wlm[L.RIGHT_KNEE] = lm(0.05, 0.4);
     const result = measureSide3OClock(wlm);
     const shank = result.find((m) => m.label === 'Shank Angle (KOPS)')!;
     expect(shank.value).toBeCloseTo(7.1, 1);
+  });
+});
+
+// Marks one side's limbs as occluded (low MediaPipe visibility), as happens to
+// the far side of a rider filmed side-on.
+function occlude(wlm: LandmarkArray, side: 'left' | 'right'): LandmarkArray {
+  const idx = side === 'left'
+    ? [L.LEFT_SHOULDER, L.LEFT_ELBOW, L.LEFT_WRIST, L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE]
+    : [L.RIGHT_SHOULDER, L.RIGHT_ELBOW, L.RIGHT_WRIST, L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE];
+  for (const i of idx) wlm[i] = { ...wlm[i], visibility: 0.1 };
+  return wlm;
+}
+
+describe('nearSide — which leg faces the camera', () => {
+  it('picks the side MediaPipe sees more clearly', () => {
+    expect(nearSide(occlude(symmetricRider(), 'right'))).toBe('left');
+    expect(nearSide(occlude(symmetricRider(), 'left'))).toBe('right');
+  });
+
+  it('defaults to the right side (what the setup instructions ask for) on a tie', () => {
+    expect(nearSide(symmetricRider())).toBe('right');
+  });
+});
+
+describe('side positions measure the near leg, not the occluded one', () => {
+  it('3 o\'clock KOPS ignores a deviated far-side knee', () => {
+    const wlm = occlude(symmetricRider(), 'left');
+    wlm[L.LEFT_KNEE] = { ...lm(-0.05, 0.4), visibility: 0.1 }; // far leg, would read ~7°
+    const shank = measureSide3OClock(wlm).find((m) => m.label === 'Shank Angle (KOPS)')!;
+    expect(shank.value).toBeCloseTo(0, 1); // near (right) leg is straight
+  });
+});
+
+describe('measureSide6OClock — knee extension at BDC', () => {
+  it('reports one BDC row, from the leg whose pedal is at the bottom', () => {
+    const wlm = symmetricRider();
+    // Left leg at the top of the stroke: ankle raised, knee bent (~70° interior).
+    wlm[L.LEFT_KNEE]  = lm(-0.4, 0.2);
+    wlm[L.LEFT_ANKLE] = lm(-0.1, 0.45);
+    // Right leg at the bottom (y increases downward): straight, 180° interior.
+    const rows = measureSide6OClock(wlm).filter((m) => m.label.startsWith('Knee Extension'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBeCloseTo(180, 0);
   });
 });
