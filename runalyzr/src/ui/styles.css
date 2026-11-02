@@ -76,6 +76,17 @@ textarea { resize: vertical; }
   font-size: var(--font-sm);
 }
 
+#settings-btn {
+  margin-left: auto;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: var(--font-base);
+}
+
 /* ── App body ────────────────────────────────────────────── */
 #app-body {
   flex: 1;

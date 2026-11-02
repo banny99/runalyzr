@@ -12,6 +12,9 @@ import { buildJointStatuses } from './analysis/jointStatuses';
 import { LANDMARKS, OVERLAY_COLORS } from './config/defaults';
 import { drawPoseSkeleton } from '@runalyzr/shared/skeleton';
 import type { LandmarkArray, AnalysisResults, FrameData, CameraView } from './analysis/types';
+import { runThresholds, RUN_SETTINGS_SECTIONS } from './settings/thresholdStore';
+import { rescoreMetrics } from '@runalyzr/shared/analysis';
+import { openThresholdSettings } from '@runalyzr/shared/settings';
 import { initCameraController } from './ui/cameraController';
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -79,6 +82,7 @@ async function main() {
 
   const overlay = initOverlay(canvas, video);
   let lastResults: AnalysisResults | null = null;
+  let lastView: CameraView = 'unknown';
   let lastAnalysisFrameUrl: string | null = null;
   let lastAnalysisFrameAspect: number | null = null;
   let lastFrames: FrameData[] = [];
@@ -127,6 +131,7 @@ async function main() {
     const results    = calculateAllMetrics(frames, gaitEvents, gaitCycles, fps, view);
     const findings   = generateFindings(results);
     lastResults = results;
+    lastView = view;
     if (!isRerun) {
       const captured = captureAnnotatedFrame(frames[frames.length - 1].landmarks);
       lastAnalysisFrameUrl    = captured?.dataUrl ?? null;
@@ -417,6 +422,18 @@ async function main() {
   document.getElementById('analyse-btn')!.addEventListener('click', () => {
     if (analysing) return;
     runSilentAnalysis().catch(console.error);
+  });
+
+  // ── Threshold settings ──────────────────────────────────────────────────
+
+  document.getElementById('settings-btn')?.addEventListener('click', () => {
+    openThresholdSettings(RUN_SETTINGS_SECTIONS);
+  });
+  // Re-colour the existing results against the new bands (no re-analysis).
+  runThresholds.subscribe(() => {
+    if (!lastResults) return;
+    rescoreMetrics(lastResults, (k) => runThresholds.entry(k));
+    renderDashboard(lastResults, generateFindings(lastResults), lastView);
   });
 
   // ── Overlay toggle & PDF export ─────────────────────────────────────────

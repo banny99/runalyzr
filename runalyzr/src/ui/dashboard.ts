@@ -1,6 +1,7 @@
 import { METRIC_LABELS, SAGITTAL_METRICS, FRONTAL_METRICS } from '../config/defaults';
 import type { AnalysisResults, FindingItem, CameraView } from '../analysis/types';
-import { THRESHOLDS } from '../analysis/thresholds';
+import { runThresholds } from '../settings/thresholdStore';
+import { formatGreenRange } from '@runalyzr/shared/analysis';
 
 function validMetricsForView(view: CameraView): Set<string> | null {
   if (view === 'sagittal') return SAGITTAL_METRICS;
@@ -33,13 +34,11 @@ function renderSummaryCards(results: AnalysisResults, view: CameraView): void {
     for (const [key, result] of Object.entries(results) as [keyof AnalysisResults, typeof results[keyof AnalysisResults]][]) {
         if (!result) continue;
         if (allowedMetrics && !allowedMetrics.has(key)) continue;
-        const threshold = THRESHOLDS[key];
         const card = document.createElement('div');
         card.className = `metric-card ${result.status}`;
         card.dataset.metric = key;
-        const normalRange = threshold
-            ? `Normal: ${threshold.green[0]}–${threshold.green[1]}${threshold.unit}`
-            : '';
+        const range = formatGreenRange(runThresholds.entry(key));
+        const normalRange = range ? `Normal: ${range}` : '';
         card.innerHTML = `
       <div class="metric-name">${METRIC_LABELS[key] ?? key}</div>
       <div class="metric-value">${result.value.toFixed(1)}${result.unit}</div>
