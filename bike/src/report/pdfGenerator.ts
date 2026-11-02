@@ -1,7 +1,8 @@
 import { generateReport as _generateReport } from '@runalyzr/shared/pdf';
 import type { ReportSection } from '@runalyzr/shared/types';
 import { METRIC_LABELS, APP_NAME } from '../config/defaults';
-import { THRESHOLDS } from '../analysis/thresholds';
+import { rideThresholds } from '../analysis/thresholds';
+import { formatGreenRange } from '@runalyzr/shared/analysis';
 import { generateSagittalFindings, generateRearFindings, generateFrontFindings } from '../analysis/findings';
 import type { Finding } from '../analysis/findings';
 import type {
@@ -21,11 +22,8 @@ function buildSection(
   for (const [key, result] of Object.entries(metrics) as [MetricKey, MetricResult | null][]) {
     if (enabledMetrics[key] === false) continue;
     if (!result) continue;
-    const threshold = THRESHOLDS[key];
     const label = METRIC_LABELS[key] ?? key;
-    const normalRange = threshold
-      ? `${threshold.green[0]}–${threshold.green[1]}${threshold.unit}`
-      : undefined;
+    const normalRange = formatGreenRange(rideThresholds.entry(String(key)));
     metricRows.push({ label, result, normalRange });
   }
   return { title, metrics: metricRows, findings };
