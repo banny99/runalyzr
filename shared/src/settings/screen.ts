@@ -1,6 +1,7 @@
-import type { Band, ThresholdEntry, ThresholdStore } from '../analysis/index';
+import type { ThresholdEntry, ThresholdStore } from '../analysis/index';
 import {
-  applyField, barRange, clampForDrag, editableFields, fieldValue, flipSign, fromPercent, parseBoundaryInput, toPercent,
+  applyField, barRange, barSegments, clampForDrag, editableFields, fieldValue, flipSign, fromPercent, parseBoundaryInput,
+  spreadPositions, toPercent,
 } from './rowModel';
 import type { BandField } from './rowModel';
 import { SETTINGS_CSS } from './screenStyles';
@@ -28,8 +29,6 @@ const FIELD_NAMES: Record<BandField, string> = {
   lowRedAt: 'red below', green0: 'green from', green1: 'green to', highRedAt: 'red above',
 };
 
-type SegmentColour = 'red' | 'amber' | 'green';
-
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -49,41 +48,6 @@ function injectStyle(): void {
   style.id = STYLE_ID;
   style.textContent = SETTINGS_CSS;
   document.head.appendChild(style);
-}
-
-/** Coloured spans of the bar, low to high, in metric units. */
-function segments(direction: ThresholdEntry['direction'], band: Band, range: [number, number]): [SegmentColour, number, number][] {
-  const [lo, hi] = range;
-  const [g0, g1] = band.green;
-  const out: [SegmentColour, number, number][] = [];
-  if (direction === 'higher_is_worse') {
-    out.push(['green', lo, g0]);
-  } else {
-    if (band.lowRedAt !== null) out.push(['red', lo, band.lowRedAt]);
-    out.push(['amber', band.lowRedAt ?? lo, g0]);
-  }
-  out.push(['green', g0, g1]);
-  if (direction === 'lower_is_worse') {
-    out.push(['green', g1, hi]);
-  } else {
-    out.push(['amber', g1, band.highRedAt ?? hi]);
-    if (band.highRedAt !== null) out.push(['red', band.highRedAt, hi]);
-  }
-  return out;
-}
-
-/** Push box centres (percent, ascending) apart so neighbours never overlap, keeping them on the bar. */
-function spreadPositions(pcts: number[], gap: number, min: number, max: number): number[] {
-  const out = [...pcts];
-  for (let i = 0; i < out.length; i++) {
-    const floor = i === 0 ? min : out[i - 1] + gap;
-    if (out[i] < floor) out[i] = floor;
-  }
-  for (let i = out.length - 1; i >= 0; i--) {
-    const ceil = i === out.length - 1 ? max : out[i + 1] - gap;
-    if (out[i] > ceil) out[i] = ceil;
-  }
-  return out;
 }
 
 function sideLabels(direction: ThresholdEntry['direction'], row: SettingsRow): string[] {
@@ -160,8 +124,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
       const band = store.band(key);
       if (!band) return;
       e.preventDefault();
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && overlay.contains(active)) active.blur();
+      overlay.focus({ preventScroll: true }); // a focused box must let go so it can follow the drag
       handle.setPointerCapture(e.pointerId);
       dragField = field;
       dragRange = barRange(band, signed);
@@ -182,7 +145,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
   }
 
   function buildBox(field: BandField): { box: HTMLElement; input: HTMLInputElement } {
-    const box = el('div', 'ts-box');
+    const box = el('div', signed ? 'ts-box ts-box-signed' : 'ts-box');
     const input = el('input');
     input.type = 'text';
     input.inputMode = 'decimal';
@@ -203,7 +166,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
       const all = [...overlay.querySelectorAll('input')];
       const next = all[all.indexOf(input) + 1];
       if (next) next.focus();
-      else input.blur();
+      else overlay.focus({ preventScroll: true });
     });
     box.appendChild(input);
     if (signed) {
@@ -257,7 +220,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     track = el('div', 'ts-track');
     bar = el('div', 'ts-bar');
     track.appendChild(bar);
-    boxesEl = el('div', 'ts-boxes');
+    boxesEl = el('div', signed ? 'ts-boxes ts-boxes-signed' : 'ts-boxes');
     for (const field of fields) {
       const handle = buildHandle(field);
       handles.set(field, handle);
@@ -287,7 +250,7 @@ function createRow(store: ThresholdStore<string>, row: SettingsRow, overlay: HTM
     if (!entry || !band) return;
 
     const range = dragRange ?? barRange(band, signed);
-    bar.replaceChildren(...segments(entry.direction, band, range).map(([colour, from, to]) => {
+    bar.replaceChildren(...barSegments(entry.direction, band, range).map(([colour, from, to]) => {
       const seg = el('div', `ts-seg ts-${colour}`);
       const left = toPercent(from, range);
       seg.style.left = `${left}%`;
@@ -335,6 +298,7 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', title);
+  overlay.tabIndex = -1;
 
   const header = el('div', 'ts-header');
   const back = button('ts-back', `← ${title}`);
@@ -362,6 +326,7 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
   }
   // Rows were first laid out off-document; place them again now the bar has a width.
   for (const view of allViews) view.update();
+  overlay.focus({ preventScroll: true });
 
   const unsubscribes = [...viewsByStore].map(([store, views]) =>
     store.subscribe(() => { for (const v of views) v.update(); }));
@@ -369,17 +334,24 @@ export function openThresholdSettings(sections: SettingsSection[], opts: { title
   resetAll.addEventListener('click', () => { for (const store of viewsByStore.keys()) store.resetAll(); });
 
   const onResize = (): void => { for (const v of allViews) v.update(); };
-  const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') close(); };
   window.addEventListener('resize', onResize);
-  document.addEventListener('keydown', onKey);
-
   let closed = false;
+  // Modal: keys pressed here must not reach the app's own shortcuts (e.g. Space toggling the video underneath).
+  overlay.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') close();
+  });
+  overlay.addEventListener('keyup', (e) => e.stopPropagation());
+  // Keep focus inside the overlay so keys keep landing here after a box loses focus.
+  overlay.addEventListener('focusout', (e) => {
+    if (!closed && e.relatedTarget === null) overlay.focus({ preventScroll: true });
+  });
+
   function close(): void {
     if (closed) return;
     closed = true;
     for (const unsubscribe of unsubscribes) unsubscribe();
     window.removeEventListener('resize', onResize);
-    document.removeEventListener('keydown', onKey);
     overlay.remove();
     document.body.style.overflow = prevBodyOverflow;
   }

@@ -5,6 +5,7 @@ export const SETTINGS_CSS = `
   overflow-y: auto; overscroll-behavior: contain;
   background: var(--bg, Canvas); color: var(--text, CanvasText);
 }
+.ts-overlay:focus { outline: none; }
 .ts-overlay button {
   font: inherit; color: inherit; background: none; cursor: pointer;
   border: 1px solid #8886; border-radius: 6px; padding: 4px 10px; min-height: 36px;
@@ -19,14 +20,16 @@ export const SETTINGS_CSS = `
 .ts-overlay .ts-back { border: none; font-weight: 600; padding-left: 0; }
 .ts-content {
   max-width: 720px; margin: 0 auto;
-  padding: 0 16px max(48px, env(safe-area-inset-bottom));
+  /* 22 px sides: the end handles' 44 px hit areas overhang the bar by half their width. */
+  padding: 0 22px max(48px, env(safe-area-inset-bottom));
 }
 .ts-group {
   margin: 20px 0 4px; font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .05em; opacity: .6;
 }
 .ts-row { padding: 12px 0; border-bottom: 1px solid #8882; }
-.ts-name { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; }
+.ts-name { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; }
+.ts-name > span { min-width: 0; overflow-wrap: anywhere; }
 .ts-name small, .ts-covers { font-weight: 400; opacity: .6; }
 .ts-changed { margin-left: 6px; font-size: 11px; font-weight: 400; color: #f59e0b; }
 .ts-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -57,7 +60,10 @@ export const SETTINGS_CSS = `
   color: inherit; background: transparent; border: 1px solid #8886; border-radius: 4px;
 }
 .ts-box input.err { border-color: #ef4444; background: #ef444422; }
-.ts-overlay .ts-sign { min-width: 34px; min-height: 34px; padding: 0; }
+/* Signed rows stack ± under its box so four boxes still fit a 320 px phone. */
+.ts-boxes-signed { height: 70px; }
+.ts-box-signed { flex-direction: column; }
+.ts-overlay .ts-sign { width: 60px; min-height: 34px; padding: 0; }
 .ts-legend { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; opacity: .65; }
 .ts-msg { margin-top: 4px; font-size: 12px; color: #ef4444; }
 .ts-msg:empty { display: none; }
@@ -65,6 +71,7 @@ export const SETTINGS_CSS = `
   .ts-overlay button { min-height: 44px; }
   .ts-boxes { height: 44px; }
   .ts-box input { height: 44px; }
-  .ts-overlay .ts-sign { min-width: 44px; min-height: 44px; }
+  .ts-boxes-signed { height: 90px; }
+  .ts-overlay .ts-sign { min-height: 44px; }
 }
 `;

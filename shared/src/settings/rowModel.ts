@@ -83,3 +83,50 @@ export function clampForDrag(band: Band, field: BandField, value: number): numbe
 export function flipSign(text: string): string {
   return text.startsWith('-') ? text.slice(1) : '-' + text;
 }
+
+export type SegmentColour = 'red' | 'amber' | 'green';
+
+/** Coloured spans of the bar, low to high, in metric units. A null red edge runs amber to the bar end. */
+export function barSegments(
+  direction: ThresholdEntry['direction'], band: Band, range: [number, number],
+): [SegmentColour, number, number][] {
+  const [lo, hi] = range;
+  const [g0, g1] = band.green;
+  const out: [SegmentColour, number, number][] = [];
+  if (direction === 'higher_is_worse') {
+    out.push(['green', lo, g0]);
+  } else {
+    if (band.lowRedAt !== null) out.push(['red', lo, band.lowRedAt]);
+    out.push(['amber', band.lowRedAt ?? lo, g0]);
+  }
+  out.push(['green', g0, g1]);
+  if (direction === 'lower_is_worse') {
+    out.push(['green', g1, hi]);
+  } else {
+    out.push(['amber', g1, band.highRedAt ?? hi]);
+    if (band.highRedAt !== null) out.push(['red', band.highRedAt, hi]);
+  }
+  return out;
+}
+
+/**
+ * Box centres (percent, ascending) pushed at least `gap` apart and kept within [min, max]
+ * so no box leaves the bar. When they cannot all fit, they are spread evenly across [min, max].
+ */
+export function spreadPositions(pcts: number[], gap: number, min: number, max: number): number[] {
+  const n = pcts.length;
+  if (n === 0) return [];
+  if (max <= min) return pcts.map(() => (min + max) / 2); // a single box wider than the bar: centre it
+  // Only reachable with n ≥ 2, since (n - 1) * gap is 0 for one box.
+  if ((n - 1) * gap > max - min) return pcts.map((_, i) => min + (i * (max - min)) / (n - 1));
+  const out = [...pcts];
+  for (let i = 0; i < n; i++) {
+    const floor = i === 0 ? min : out[i - 1] + gap;
+    if (out[i] < floor) out[i] = floor;
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    const ceil = i === n - 1 ? max : out[i + 1] - gap;
+    if (out[i] > ceil) out[i] = ceil;
+  }
+  return out;
+}

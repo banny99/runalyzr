@@ -170,9 +170,34 @@ describe('threshold settings screen', () => {
     first.close(); // idempotent
 
     open([{ title: 'Ride', store, rows }]);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.querySelector('.ts-overlay')).toBeNull();
     expect(document.querySelectorAll('#threshold-settings-style')).toHaveLength(1);
+  });
+
+  test('keys pressed in the overlay never reach the app underneath; Escape still closes', () => {
+    const store = makeStore();
+    open([{ title: 'Ride', store, rows: [{ key: 'knee', label: 'Knee' }] }]);
+    const overlay = document.querySelector<HTMLElement>('.ts-overlay');
+    expect(document.activeElement).toBe(overlay);
+    const seen: string[] = [];
+    const appShortcut = (e: KeyboardEvent) => { seen.push(e.key); };
+    document.addEventListener('keydown', appShortcut);
+    try {
+      const resetAll = button(document, 'Reset all');
+      resetAll.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      input('knee', 'green0').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      expect(seen).toEqual([]);
+      // A box losing focus hands it back to the overlay, not to the page underneath.
+      input('knee', 'green0').focus();
+      input('knee', 'green0').blur();
+      expect(document.activeElement).toBe(overlay);
+      resetAll.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.querySelector('.ts-overlay')).toBeNull();
+      expect(seen).toEqual([]);
+    } finally {
+      document.removeEventListener('keydown', appShortcut);
+    }
   });
 
   test('dragging a handle saves the clamped value and updates its box', () => {

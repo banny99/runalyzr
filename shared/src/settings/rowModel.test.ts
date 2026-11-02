@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Band, ThresholdEntry } from '../analysis/index';
 import {
-  applyField, barRange, clampForDrag, editableFields, flipSign, fromPercent, parseBoundaryInput, toPercent,
+  applyField, barRange, barSegments, clampForDrag, editableFields, flipSign, fromPercent, parseBoundaryInput, spreadPositions, toPercent,
 } from './rowModel';
 
 const twoSided: ThresholdEntry = { green: [145, 155], amber: [135, 145], amberHigh: [155, 160], unit: '°', direction: 'two_sided' };
@@ -59,6 +59,32 @@ describe('settings row model', () => {
     expect(clampForDrag(b, 'green0', -50)).toBe(-50);
     expect(clampForDrag(b, 'green1', 99)).toBe(99);
     expect(clampForDrag(b, 'green1', -1)).toBe(0);
+  });
+  test('spreadPositions pushes overlapping boxes apart and keeps the end boxes on the bar', () => {
+    expect(spreadPositions([0, 45, 50, 100], 10, 5, 95)).toEqual([5, 45, 55, 95]);
+    expect(spreadPositions([0, 90, 95, 100], 10, 5, 95)).toEqual([5, 75, 85, 95]);
+    expect(spreadPositions([20, 40, 60], 10, 5, 95)).toEqual([20, 40, 60]);
+  });
+  test('spreadPositions distributes evenly inside the bar when the boxes cannot fit', () => {
+    // Four 106 px boxes on a 328 px bar: gap ≈ 33.5 %, edges ≈ 16.2 % / 83.8 %.
+    const out = spreadPositions([0, 45, 55, 100], 33.5, 16.2, 83.8);
+    expect(out[0]).toBeCloseTo(16.2);
+    expect(out[3]).toBeCloseTo(83.8);
+    for (const v of out) { expect(v).toBeGreaterThanOrEqual(16.2 - 1e-9); expect(v).toBeLessThanOrEqual(83.8 + 1e-9); }
+    expect(out[1] - out[0]).toBeCloseTo(out[2] - out[1]);
+    expect(spreadPositions([0], 200, 60, 40)).toEqual([50]);
+  });
+  test('barSegments colours each span by direction; null red runs amber to the bar end', () => {
+    const r: [number, number] = [0, 100];
+    expect(barSegments('two_sided', { green: [40, 60], lowRedAt: 20, highRedAt: null }, r)).toEqual([
+      ['red', 0, 20], ['amber', 20, 40], ['green', 40, 60], ['amber', 60, 100],
+    ]);
+    expect(barSegments('lower_is_worse', { green: [40, 60], lowRedAt: 20, highRedAt: null }, r)).toEqual([
+      ['red', 0, 20], ['amber', 20, 40], ['green', 40, 60], ['green', 60, 100],
+    ]);
+    expect(barSegments('higher_is_worse', { green: [40, 60], lowRedAt: null, highRedAt: 80 }, r)).toEqual([
+      ['green', 0, 40], ['green', 40, 60], ['amber', 60, 80], ['red', 80, 100],
+    ]);
   });
   test('flipSign', () => {
     expect(flipSign('2')).toBe('-2');
