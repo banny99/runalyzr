@@ -2,8 +2,9 @@ import type { Landmark, LandmarkArray } from '@runalyzr/shared/types';
 import { angleBetweenThreePoints, lateralAngle, tiltFromHorizontal, midpoint } from '@runalyzr/shared/math';
 import { LANDMARKS } from '../config/defaults';
 import type { FitMeasurement } from './types';
-import type { Band } from './bands';
-import { bandStatus } from './bands';
+import { evaluateThreshold, formatGreenRange } from '@runalyzr/shared/analysis';
+import type { FitMetricId } from './fitThresholds';
+import { fitThresholds } from './fitThresholds';
 
 const L = LANDMARKS;
 
@@ -16,10 +17,15 @@ function round1(v: number): number {
   return parseFloat(v.toFixed(1));
 }
 
-/** Build a measurement with its status evaluated against the default band. */
-function entry(label: string, value: number, normalRange: string, band?: Band): FitMeasurement {
+/** Build a measurement scored against the active band for its setting id. */
+function entry(id: FitMetricId, label: string, value: number): FitMeasurement {
   const rounded = round1(value);
-  return { label, value: rounded, unit: '°', normalRange, status: bandStatus(rounded, band) };
+  const t = fitThresholds.entry(id);
+  return {
+    id, label, value: rounded, unit: '°',
+    normalRange: formatGreenRange(t) ?? '—',
+    status: evaluateThreshold(rounded, t),
+  };
 }
 
 function angle(wlm: LandmarkArray, a: number, b: number, c: number): number {
@@ -81,10 +87,10 @@ export function sideUpperBody(wlm: LandmarkArray): FitMeasurement[] {
   // shared with the ride-video torsoAngle ([35,50]); Reach and the new
   // Shoulder angle are informational (no band → 'unknown') pending calibration.
   const out: FitMeasurement[] = [];
-  if (ls && lh)       out.push(entry('Torso Angle',    lateralAngle(ls, lh),                 '35–50°',  [35, 50]));
-  if (ls && le && lw) out.push(entry('Elbow Angle',    angleBetweenThreePoints(ls, le, lw),  '90–160°', [90, 160]));
-  if (ls && lw)       out.push(entry('Reach Angle',    lateralAngle(ls, lw),                 '—'));
-  if (lh && ls && le) out.push(entry('Shoulder Angle', angleBetweenThreePoints(lh, ls, le),  '—'));
+  if (ls && lh)       out.push(entry('torsoAngle', 'Torso Angle', lateralAngle(ls, lh)));
+  if (ls && le && lw) out.push(entry('elbowAngle', 'Elbow Angle', angleBetweenThreePoints(ls, le, lw)));
+  if (ls && lw)       out.push(entry('reachAngle', 'Reach Angle', lateralAngle(ls, lw)));
+  if (lh && ls && le) out.push(entry('shoulderAngle', 'Shoulder Angle', angleBetweenThreePoints(lh, ls, le)));
   return out;
 }
 
@@ -96,7 +102,7 @@ export function measureSide6OClock(wlm: LandmarkArray): FitMeasurement[] {
   // downward.
   const S = wlm[L.LEFT_ANKLE].y > wlm[L.RIGHT_ANKLE].y ? SIDE.left : SIDE.right;
   return [
-    entry('Knee Extension at BDC', angle(wlm, S.HIP, S.KNEE, S.ANKLE), '145–155°', [145, 155]),
+    entry('kneeExtensionBDC', 'Knee Extension at BDC', angle(wlm, S.HIP, S.KNEE, S.ANKLE)),
     ...sideUpperBody(wlm),
   ];
 }
@@ -113,8 +119,8 @@ export function measureSide3OClock(wlm: LandmarkArray): FitMeasurement[] {
   // from vertical at 3 o'clock. ~10 mm of knee-over-pedal offset on a ~40 cm
   // shank ≈ 1.4°, so the classic 0–10 mm window is roughly 0–2°.
   return [
-    entry('Shank Angle (KOPS)',      lateralAngle(lk, la),                                 '0–2°',   [0, 2]),
-    entry('Hip Angle at 3 o\'clock', angle(wlm, S.SHOULDER, S.HIP, S.KNEE),             '45–65°', [45, 65]),
+    entry('shankKops', 'Shank Angle (KOPS)', lateralAngle(lk, la)),
+    entry('hipAngle3', 'Hip Angle at 3 o\'clock', angle(wlm, S.SHOULDER, S.HIP, S.KNEE)),
     ...sideUpperBody(wlm),
   ];
 }
@@ -125,7 +131,7 @@ export function measureSide9OClock(wlm: LandmarkArray): FitMeasurement[] {
   // Torso lean (formerly the standalone "Back Angle" here) now comes from
   // sideUpperBody, so it's reported uniformly across all side positions.
   return [
-    entry('Hip Extension at 9 o\'clock', angle(wlm, S.KNEE, S.HIP, S.SHOULDER), '160–180°', [160, 180]),
+    entry('hipExtension9', 'Hip Extension at 9 o\'clock', angle(wlm, S.KNEE, S.HIP, S.SHOULDER)),
     ...sideUpperBody(wlm),
   ];
 }
@@ -140,8 +146,8 @@ export function measureSideAero(wlm: LandmarkArray): FitMeasurement[] {
   const reachAngle = Math.abs((Math.atan2(Math.abs(ls.x - lw.x), Math.abs(ls.y - lw.y)) * 180) / Math.PI);
 
   return [
-    entry('Elbow Angle (aero)', angle(wlm, S.SHOULDER, S.ELBOW, S.WRIST),             '80–110°', [80, 110]),
-    entry('Reach Angle',        reachAngle,                                              '15–35°',  [15, 35]),
+    entry('elbowAngleAero', 'Elbow Angle (aero)', angle(wlm, S.SHOULDER, S.ELBOW, S.WRIST)),
+    entry('reachAngleAero', 'Reach Angle', reachAngle),
   ];
 }
 
@@ -155,9 +161,9 @@ export function measureRear6OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!lh || !rh || !lk || !rk || !la || !ra) return [];
 
   return [
-    entry('Pelvic Obliquity',           tiltFromHorizontal(lh, rh),       '< 3°', [0, 3]),
-    entry('Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la), '< 5°', [0, 5]),
-    entry('Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra), '< 5°', [0, 5]),
+    entry('pelvicObliquity', 'Pelvic Obliquity', tiltFromHorizontal(lh, rh)),
+    entry('kneeFrontalAlignment', 'Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la)),
+    entry('kneeFrontalAlignment', 'Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra)),
   ];
 }
 
@@ -173,10 +179,10 @@ export function measureFront6OClock(wlm: LandmarkArray): FitMeasurement[] {
   if (!lh || !rh || !lk || !rk || !la || !ra || !ls || !rs) return [];
 
   return [
-    entry('Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la),                '< 5°', [0, 5]),
-    entry('Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra),                '< 5°', [0, 5]),
-    entry('Shoulder Tilt',              tiltFromHorizontal(ls, rs),                      '< 2°', [0, 2]),
-    entry('Lateral Trunk Lean',         lateralAngle(midpoint(ls, rs), midpoint(lh, rh)), '< 2°', [0, 2]),
+    entry('kneeFrontalAlignment', 'Knee Frontal Alignment (L)', kneeFrontalDeviation(lh, lk, la)),
+    entry('kneeFrontalAlignment', 'Knee Frontal Alignment (R)', kneeFrontalDeviation(rh, rk, ra)),
+    entry('shoulderTilt', 'Shoulder Tilt', tiltFromHorizontal(ls, rs)),
+    entry('lateralTrunkLean', 'Lateral Trunk Lean', lateralAngle(midpoint(ls, rs), midpoint(lh, rh))),
   ];
 }
 

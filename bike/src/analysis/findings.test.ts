@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { rideThresholds, makeMetricResult } from './thresholds';
 import { generateRearFindings, generateSagittalFindings, generateFrontFindings } from './findings';
 import type { RearMetrics, SagittalMetrics, FrontMetrics } from './types';
 
@@ -123,5 +124,33 @@ describe('generateFrontFindings', () => {
     expect(findings[0].metric).toBe('kneeSymmetry');
     expect(findings[0].status).toBe('red');
     expect(findings[0].text).toContain('3.5');
+  });
+});
+
+describe('generic out-of-range findings', () => {
+  afterEach(() => rideThresholds.resetAll());
+
+  function sagittal(overrides: Partial<SagittalMetrics>): SagittalMetrics {
+    return {
+      kneeExtensionBDC: null, kneeFlexionTDC: null, hipAngleTDC: null,
+      hipVerticalOscillation: null, torsoAngle: null, pelvicTilt: null,
+      elbowAngle: null, shoulderAngle: null, reachAngle: null, wristAngle: null,
+      ankleAnkling: null, cadence: null,
+      ...overrides,
+    };
+  }
+
+  it('a band added to shoulderAngle produces the generic finding', () => {
+    rideThresholds.addBand('shoulderAngle');
+    const metrics = sagittal({ shoulderAngle: makeMetricResult(72, 'shoulderAngle') });
+    const findings = generateSagittalFindings(metrics);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].text).toBe('Shoulder Angle of 72.0° is outside your set range of 80–100°.');
+  });
+
+  it('banded metrics without templates stay silent', () => {
+    const metrics = sagittal({ pelvicTilt: makeMetricResult(20, 'pelvicTilt') });
+    expect(metrics.pelvicTilt?.status).toBe('red');
+    expect(generateSagittalFindings(metrics)).toHaveLength(0);
   });
 });

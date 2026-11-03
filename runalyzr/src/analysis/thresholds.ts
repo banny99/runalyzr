@@ -1,6 +1,6 @@
 import type { MetricStatus, MetricResult, AnalysisResults } from './types';
-import { evaluateThreshold, thresholdMetricResult } from '@runalyzr/shared/analysis';
-import type { ThresholdEntry } from '@runalyzr/shared/analysis';
+import { evaluateThreshold, thresholdMetricResult, createThresholdStore } from '@runalyzr/shared/analysis';
+import type { ThresholdEntry, ThresholdStore } from '@runalyzr/shared/analysis';
 
 // The evaluation engine (green wins at the boundary, half-open amber bands)
 // lives in @runalyzr/shared/analysis — only the table is app-specific.
@@ -24,16 +24,22 @@ export const THRESHOLDS: Record<keyof AnalysisResults, ThresholdEntry> = {
   groundContactTime:     { green: [200, 260], amber: [260, 300], unit: ' ms',  direction: 'higher_is_worse' },
 };
 
+// Active bands: the defaults above plus any device-stored overrides. Created
+// here (not in settings/) so evaluateMetric can read it without an import cycle;
+// settings/thresholdStore.ts re-exports it.
+export const runThresholds: ThresholdStore<keyof AnalysisResults> =
+  createThresholdStore('runalyzr.thresholds.v1', THRESHOLDS);
+
 export function evaluateMetric(
   value: number,
   key: keyof typeof THRESHOLDS,
 ): MetricStatus {
-  return evaluateThreshold(value, THRESHOLDS[key]);
+  return evaluateThreshold(value, runThresholds.entry(key) ?? THRESHOLDS[key]);
 }
 
 export function makeMetricResult(
   value: number,
   key: keyof typeof THRESHOLDS,
 ): MetricResult {
-  return thresholdMetricResult(value, THRESHOLDS[key]);
+  return thresholdMetricResult(value, runThresholds.entry(key) ?? THRESHOLDS[key]);
 }

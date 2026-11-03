@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { buildReportSections } from './pdfGenerator';
+import { runThresholds } from '../settings/thresholdStore';
 import type { ReportParams, AnalysisResults } from '../analysis/types';
 
 const emptyResults: AnalysisResults = {
@@ -31,6 +32,14 @@ function params(overrides: Partial<ReportParams> = {}): ReportParams {
 }
 
 describe('buildReportSections', () => {
+  afterEach(() => runThresholds.resetAll());
+
+  it('normal range follows a threshold override', () => {
+    runThresholds.set('cadence', { green: [175, 195], lowRedAt: 165, highRedAt: null });
+    const [section] = buildReportSections(params());
+    expect(section.metrics[0].normalRange).toBe('175–195 spm');
+  });
+
   it('builds metric rows with labels, ranges and findings', () => {
     const [section] = buildReportSections(params());
     expect(section.title).toBe('Gait Metrics');

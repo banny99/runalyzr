@@ -51,6 +51,17 @@ html, body {
   padding: 0.25rem;
 }
 
+#settings-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
 .mode-tab {
   padding: 0.35rem 1rem;
   border-radius: 6px;

@@ -1,3 +1,5 @@
+import type { FitMetricId } from './fitThresholds';
+import type { GeometryAngleId } from './geometryThresholds';
 import type { MetricResult, MetricStatus, LandmarkArray } from '@runalyzr/shared/types';
 export type { CameraView, MetricStatus, MetricResult, Landmark, LandmarkArray, FrameData } from '@runalyzr/shared/types';
 
@@ -69,11 +71,11 @@ export interface PlacedPoint {
 }
 
 export interface BikeAngleMeasurement {
-  id: string;
+  id: GeometryAngleId;
   label: string;
   value: number;      // degrees, rounded to 1 dp
   normalRange: string;
-  status: MetricStatus; // green inside the default band, amber outside, unknown when no band
+  status: MetricStatus; // green inside the active band, amber outside, unknown when no band
 }
 
 export interface BikeGeometryResult {
@@ -88,11 +90,12 @@ export interface BikeGeometryResult {
 // ── Fit mode ──────────────────────────────────────────────────────────────
 
 export interface FitMeasurement {
+  id: FitMetricId;      // stable setting id; one id can cover several rows/positions
   label: string;
   value: number;
   unit: string;
-  normalRange?: string;
-  status: MetricStatus; // green inside the default band, amber outside, unknown when no band
+  normalRange: string;  // from the active band, '—' when information-only
+  status: MetricStatus; // scored against the active band
 }
 
 export interface FitPositionResult {

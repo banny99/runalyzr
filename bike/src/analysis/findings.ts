@@ -1,5 +1,8 @@
+import { METRIC_LABELS } from '../config/defaults';
+import { THRESHOLDS, rideThresholds } from './thresholds';
 import type { SagittalMetrics, RearMetrics, FrontMetrics } from './types';
-import { findingsFromTemplates } from '@runalyzr/shared/analysis';
+import { findingsFromTemplates, outOfRangeText } from '@runalyzr/shared/analysis';
+import type { MetricResult } from '@runalyzr/shared/types';
 import type { FindingTemplate, TemplatedFinding } from '@runalyzr/shared/analysis';
 
 type Finding = TemplatedFinding;
@@ -75,19 +78,29 @@ const TEMPLATES: Partial<Record<string, FindingTemplate>> = {
   },
 };
 
+// Generic text only for metrics that are information-only *by default* and
+// have since been given a band by the fitter. Banded-but-template-less metrics
+// (pelvicTilt, ankleAnkling, ...) stay silent, as before.
+function fallback(key: string, result: MetricResult): string | undefined {
+  if (!THRESHOLDS[key]?.indicativeOnly) return undefined;
+  const entry = rideThresholds.entry(key);
+  if (!entry || entry.indicativeOnly) return undefined;
+  return outOfRangeText(METRIC_LABELS[key] ?? key, result, entry);
+}
+
 // The template-substitution/sorting engine lives in @runalyzr/shared/analysis
 // (red-first sort included — previously copy-pasted across three wrappers);
 // only the template table above is app-specific.
 export function generateSagittalFindings(metrics: SagittalMetrics): Finding[] {
-  return findingsFromTemplates(metrics, TEMPLATES);
+  return findingsFromTemplates(metrics, TEMPLATES, fallback);
 }
 
 export function generateRearFindings(metrics: RearMetrics): Finding[] {
-  return findingsFromTemplates(metrics, TEMPLATES);
+  return findingsFromTemplates(metrics, TEMPLATES, fallback);
 }
 
 export function generateFrontFindings(metrics: FrontMetrics): Finding[] {
-  return findingsFromTemplates(metrics, TEMPLATES);
+  return findingsFromTemplates(metrics, TEMPLATES, fallback);
 }
 
 export type { Finding };

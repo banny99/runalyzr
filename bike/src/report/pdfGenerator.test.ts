@@ -19,7 +19,7 @@ const riderPosition = {
   landmarks: [],
   worldLandmarks: [],
   measurements: [
-    { label: 'Knee angle', value: 145, unit: '°', normalRange: '140–150', status: 'green' as const },
+    { label: 'Knee angle', value: 145, unit: '°', id: 'kneeExtensionBDC' as const, normalRange: '140–150', status: 'green' as const },
   ],
   imageDataUrl: 'data:image/jpeg;base64,RIDER',
   imageAspect: 1.5,
@@ -32,7 +32,7 @@ const bikeGeometry = {
   imageAspect: 0.75,
   points: [],
   angles: [
-    { id: 'drop', label: 'Bar drop', value: 5, normalRange: '0–10', status: 'green' as const },
+    { id: 'bar_drop_angle' as const, label: 'Bar drop', value: 5, normalRange: '0–10', status: 'green' as const },
   ],
 };
 

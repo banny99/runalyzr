@@ -13,6 +13,7 @@ export default defineConfig({
       '@runalyzr/shared/processing': resolve(__dirname, '../shared/src/pose/processing.ts'),
       '@runalyzr/shared/skeleton': resolve(__dirname, '../shared/src/pose/skeleton.ts'),
       '@runalyzr/shared/analysis': resolve(__dirname, '../shared/src/analysis/index.ts'),
+      '@runalyzr/shared/settings': resolve(__dirname, '../shared/src/settings/index.ts'),
       '@runalyzr/shared/pdf':   resolve(__dirname, '../shared/src/pdf/renderer.ts'),
     },
   },

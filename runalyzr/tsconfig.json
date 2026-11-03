@@ -18,6 +18,7 @@
       "@runalyzr/shared/processing": ["../shared/src/pose/processing.ts"],
       "@runalyzr/shared/skeleton": ["../shared/src/pose/skeleton.ts"],
       "@runalyzr/shared/analysis": ["../shared/src/analysis/index.ts"],
+      "@runalyzr/shared/settings": ["../shared/src/settings/index.ts"],
       "@runalyzr/shared/pdf": ["../shared/src/pdf/renderer.ts"]
     }
   },

@@ -1,6 +1,7 @@
 import type { AngleDefinition } from '../config/defaults';
 import type { PlacedPoint, BikeAngleMeasurement } from './types';
-import { bandStatus } from './bands';
+import { evaluateThreshold, formatGreenRange } from '@runalyzr/shared/analysis';
+import { geometryThresholds } from './geometryThresholds';
 
 /** Point-id pairs to draw as connection lines, derived from angle definitions. */
 export function anglePointPairs(angleDefs: AngleDefinition[]): [string, string][] {
@@ -60,12 +61,13 @@ export function computeBikeAngles(
     }
 
     const rounded = parseFloat(value.toFixed(1));
+    const entry = geometryThresholds.entry(def.id);
     results.push({
       id: def.id,
       label: def.label,
       value: rounded,
-      normalRange: def.normalRange,
-      status: bandStatus(rounded, def.green),
+      normalRange: formatGreenRange(entry) ?? '—',
+      status: evaluateThreshold(rounded, entry),
     });
   }
 
